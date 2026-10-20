@@ -34,7 +34,11 @@ function parseColor(value: string): RGB {
 }
 
 const colorCache = new Map<string, string>()
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => colorCache.clear())
+let themeVersion = 0
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  colorCache.clear()
+  themeVersion += 1
+})
 
 function cssColor(name: string, fallback: string): string {
   const cached = colorCache.get(name)
@@ -266,6 +270,7 @@ export function NetworkCanvas({
 
     let signature = ""
     let activeUntil = 0
+    let themeSeen = themeVersion
 
     const draw = (now: number) => {
       const rect = wrap.getBoundingClientRect()
@@ -284,7 +289,8 @@ export function NetworkCanvas({
       }
       const rawTrace = latestTrace
       const key = `${sizesRef.current.join(",")}@${imageRef.current ?? 0}`
-      if (traceSeq !== (rawTrace?.seq ?? 0) || key !== sizeKey) {
+      if (traceSeq !== (rawTrace?.seq ?? 0) || key !== sizeKey || themeSeen !== themeVersion) {
+        themeSeen = themeVersion
         traceSeq = rawTrace?.seq ?? 0
         sizeKey = key
         rebuild()

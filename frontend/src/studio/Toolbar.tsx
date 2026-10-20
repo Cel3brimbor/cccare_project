@@ -221,7 +221,7 @@ export function Toolbar({
           aria-controls="machine-vitals"
           onClick={() => setMachine((open) => !open)}
         >
-          {machine ? "Hide machine" : "Machine"}
+          {machine ? "Hide details" : "Details"}
         </button>
         <p id="machine-vitals" className={machine ? "vitals is-open" : "vitals"} title={tooltip}>
           <span>CPU {system ? formatPct(system.cpu) : "—"}</span>

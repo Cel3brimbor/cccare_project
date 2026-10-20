@@ -947,6 +947,7 @@
     cursor: pointer;
   }
 
+  .c-toggle-flag { font-size: 0.8125rem; }
   .c-census-toggle svg { margin-left: auto; transition: transform 150ms ease; }
   .c-census-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
   .c-patient-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }

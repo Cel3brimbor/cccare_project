@@ -307,6 +307,9 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
             >
               <span>{listOpen ? "Hide patients" : "Patients"}</span>
               <span className="c-count">{patients.length}</span>
+              {groups[0]?.name === "Worsening" && !listOpen ? (
+                <span className="c-bad c-toggle-flag">{groups[0].items.length} worsening</span>
+              ) : null}
               <CaretDown size={16} weight="bold" aria-hidden="true" />
             </button>
             <div id="patient-list" className={listOpen ? "c-census-body is-open" : "c-census-body"}>
