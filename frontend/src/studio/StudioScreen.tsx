@@ -6,7 +6,7 @@ import { usePrefers } from "./media"
 import { ModelPopover } from "./ModelPopover"
 import { NetworkCanvas } from "./NetworkCanvas"
 import { ProbeSheet } from "./ProbeSheet"
-import { connect, send, useStudio } from "./store"
+import { connect, disconnect, send, useStudio } from "./store"
 import { Toolbar } from "./Toolbar"
 import type { Selection } from "./types"
 import "katex/dist/katex.min.css"
@@ -15,6 +15,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
   const studio = useStudio()
   useEffect(() => {
     connect()
+    return disconnect
   }, [])
   useEffect(() => {
     const previous = document.title

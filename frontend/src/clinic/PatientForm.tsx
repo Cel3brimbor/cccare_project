@@ -131,7 +131,15 @@ export function PatientForm({
               <ul>
                 {errorItems.map((field) => (
                   <li key={field}>
-                    <a href={`#patient-${field}`}>{errors[field]}</a>
+                    <a
+                      href={`#patient-${field}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        document.getElementById(`patient-${field}`)?.focus()
+                      }}
+                    >
+                      {errors[field]}
+                    </a>
                   </li>
                 ))}
               </ul>

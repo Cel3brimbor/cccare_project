@@ -527,7 +527,9 @@ function isPatient(value: unknown): value is Patient {
       CONDITIONS.some((condition) => condition.id === patient.conditionId) &&
       typeof patient.adherence === "number" &&
       Array.isArray(patient.problems) &&
+      patient.problems.every((item) => typeof item === "string") &&
       Array.isArray(patient.medications) &&
+      patient.medications.every((item) => typeof item === "string") &&
       typeof patient.allergies === "string" &&
       typeof patient.note === "string" &&
       Array.isArray(patient.readings) &&

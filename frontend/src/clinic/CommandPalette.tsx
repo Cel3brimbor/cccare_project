@@ -95,7 +95,15 @@ export function CommandPalette({
 
   return (
     <div className="c-scrim c-palette-scrim" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="c-palette" role="dialog" aria-modal="true" aria-label="Go to a patient or action">
+      <div
+        className="c-palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Go to a patient or action"
+        onMouseDown={(event) => {
+          if (event.target !== input.current) event.preventDefault()
+        }}
+      >
         <div className="c-palette-field">
           <MagnifyingGlass size={20} aria-hidden="true" />
           <input

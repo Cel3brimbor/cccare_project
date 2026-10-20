@@ -28,7 +28,12 @@ const MEASURE_TAGS: Record<string, string> = {
 
 function patientIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/patients\/([^/?#]+)/)
-  return match ? decodeURIComponent(match[1]) : null
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return null
+  }
 }
 
 export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
@@ -64,7 +69,10 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   useEffect(() => {
     if (patientIdFromHash()) return
     const first = orderPatients(patients, "all", "")[0]
-    if (first) window.location.hash = `#/patients/${first.id}`
+    if (first) {
+      window.history.replaceState(null, "", `#/patients/${encodeURIComponent(first.id)}`)
+      setPatientId(first.id)
+    }
   }, [patients])
 
   const known = patientId ? patients.find((item) => item.id === patientId) : undefined
@@ -104,7 +112,8 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
         if (!formOpen) {
-          if (!paletteOpen) opener.current = document.activeElement as HTMLElement | null
+          if (paletteOpen) returnFocus.current = "opener"
+          else opener.current = document.activeElement as HTMLElement | null
           setPaletteOpen((open) => !open)
         }
       } else if (event.key === "/" && !typing && !formOpen) {
@@ -179,9 +188,13 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   function remove(target: Patient) {
     const next = added.filter((item) => item.id !== target.id)
     setAdded(next)
-    saveAdded(next)
+    const saved = saveAdded(next)
     setArmed(false)
-    announce(`Removed ${fullName(target)} from this browser.`)
+    announce(
+      saved
+        ? `Removed ${fullName(target)} from this browser.`
+        : `Removed ${fullName(target)} for this visit only. This browser is not allowing saved records, so it may return after a reload.`,
+    )
     const fallback = patients.find((item) => item.id !== target.id)
     if (fallback) select(fallback.id)
   }
@@ -196,7 +209,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     document.body.appendChild(link)
     link.click()
     link.remove()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     announce(`Downloaded a projection file for ${fullName(patient)}.`)
   }
 
@@ -228,7 +241,15 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
 
   return (
     <div className="clinic">
-      <a className="c-skip" href="#patient-chart">
+      <a
+        className="c-skip"
+        href="#patient-chart"
+        onClick={(event) => {
+          event.preventDefault()
+          heading.current?.focus()
+          heading.current?.scrollIntoView({ block: "start" })
+        }}
+      >
         Skip to chart
       </a>
       <div className="c-toast-region" role="status" aria-live="polite">

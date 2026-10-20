@@ -33,8 +33,15 @@ function parseColor(value: string): RGB {
   return [140, 140, 140]
 }
 
+const colorCache = new Map<string, string>()
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => colorCache.clear())
+
 function cssColor(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+  const cached = colorCache.get(name)
+  if (cached) return cached
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  if (value) colorCache.set(name, value)
+  return value || fallback
 }
 
 function shownUnits(count: number): number[] {
@@ -257,6 +264,9 @@ export function NetworkCanvas({
       }
     }
 
+    let signature = ""
+    let activeUntil = 0
+
     const draw = (now: number) => {
       const rect = wrap.getBoundingClientRect()
       const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -278,6 +288,16 @@ export function NetworkCanvas({
         traceSeq = rawTrace?.seq ?? 0
         sizeKey = key
         rebuild()
+      }
+      const chosen = selectionRef.current
+      const next = `${width}x${height}|${traceSeq}|${sizeKey}|${hover.layer}:${hover.unit}|${chosen.layer}:${chosen.unit}|${colorCache.size}`
+      if (next !== signature) {
+        signature = next
+        activeUntil = now + 3000
+      } else if (now > activeUntil && particles.length === 0) {
+        last = now
+        frame = requestAnimationFrame(draw)
+        return
       }
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, width, height)
@@ -338,6 +358,16 @@ export function NetworkCanvas({
       const ink = cssColor("--secondary", "#a1a1a6")
       const text = cssColor("--text", "#f5f5f7")
       const selected = selectionRef.current
+      const layerStats = new Map<number, { scale: number; count: number }>()
+      nodes.forEach((node) => {
+        const entry = layerStats.get(node.layer)
+        if (entry) entry.count += 1
+        else layerStats.set(node.layer, { scale: 0, count: 1 })
+      })
+      layerStats.forEach((entry, layer) => {
+        const values = nodes.filter((item) => item.layer === layer).map((item) => Math.abs(activationAt(trace, item.layer, item.unit)))
+        entry.scale = Math.max(0.2, percentile(values, 0.9))
+      })
       nodes.forEach((node) => {
         const value = activationAt(trace, node.layer, node.unit)
         const hot = selected.layer === node.layer && selected.unit === node.unit
@@ -357,9 +387,9 @@ export function NetworkCanvas({
           }
           return
         }
-        const layerValues = nodes.filter((item) => item.layer === node.layer).map((item) => Math.abs(activationAt(trace, item.layer, item.unit)))
-        const scale = Math.max(0.2, percentile(layerValues, 0.9))
-        const columnCount = nodes.filter((item) => item.layer === node.layer).length || 1
+        const stats = layerStats.get(node.layer)
+        const scale = stats?.scale ?? 0.2
+        const columnCount = stats?.count ?? 1
         const span = columnCount === 1 ? 40 : (height - 168) / (columnCount - 1)
         const radius = node.layer === sizesRef.current.length - 1 ? Math.min(12, span * 0.45) : Math.max(1.7, Math.min(6.5, span * 0.32))
         context.beginPath()
@@ -398,7 +428,7 @@ export function NetworkCanvas({
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       if (!reducedRef.current) {
-        spawn(dt)
+        if (now < activeUntil) spawn(dt)
         for (let index = particles.length - 1; index >= 0; index -= 1) {
           const particle = particles[index]
           particle.t += dt * particle.speed

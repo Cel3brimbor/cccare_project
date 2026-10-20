@@ -749,7 +749,10 @@ fieldset:disabled { opacity: 0.55; }
   margin: 0;
   height: 100%;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
   color: var(--secondary);
   font-family: var(--mono);
   font-size: 0.75rem;
