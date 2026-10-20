@@ -138,7 +138,11 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     fit()
     const observer = new ResizeObserver(fit)
     observer.observe(node)
-    return () => observer.disconnect()
+    window.addEventListener("resize", fit)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", fit)
+    }
   }, [])
 
   function select(id: string, focusChart = true) {
