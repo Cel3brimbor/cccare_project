@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { CaretLeft } from "@phosphor-icons/react"
 import { formatBytes, formatPct } from "./format"
 import { Segmented } from "./Segmented"
 import { clearError, send, useStudio } from "./store"
@@ -19,6 +20,7 @@ export function Toolbar({
 }) {
   const { device, system, status, metrics, connected, error, task } = useStudio()
   const [armed, setArmed] = useState(false)
+  const [machine, setMachine] = useState(false)
   const confirmRef = useRef<HTMLButtonElement>(null)
   const running = status.phase === "running"
   const blocked = !connected || !status.metal || status.phase === "preparing" || status.phase === "evaluating"
@@ -76,7 +78,13 @@ export function Toolbar({
   return (
     <header className="toolbar" aria-busy={busy}>
       <div className="brand">
-        <strong>Network</strong>
+        {onReturn ? (
+          <button type="button" className="back" onClick={onReturn}>
+            <CaretLeft size={12} weight="bold" aria-hidden="true" />
+            Meridian Clinical
+          </button>
+        ) : null}
+        <h1>Training bench</h1>
         <span>{task === "digits" ? "Handwritten digits" : "IMDB reviews"}</span>
       </div>
       <Segmented
@@ -95,11 +103,6 @@ export function Toolbar({
         {status.message}
       </p>
       <div className="actions">
-        {onReturn ? (
-          <button type="button" className="btn" onClick={onReturn}>
-            Clinic
-          </button>
-        ) : null}
         <button
           type="button"
           data-model-button
@@ -111,6 +114,7 @@ export function Toolbar({
         >
           Model
         </button>
+        <span className="divider" aria-hidden="true" />
         {status.phase === "error" ? (
           <button type="button" className="btn primary" onClick={() => send({ type: "prepare" })}>
             Retry
@@ -121,12 +125,10 @@ export function Toolbar({
               type="button"
               className="btn primary"
               disabled={blocked && !running}
-              aria-keyshortcuts="Space"
-              title={blocked && !running ? undefined : running ? "Pause (Space)" : "Train (Space)"}
+              title={blocked && !running ? undefined : running ? "Pause. Space also pauses while the network has focus." : "Train. Space also trains while the network has focus."}
               onClick={() => send({ type: running ? "pause" : "start" })}
             >
               {running ? "Pause" : "Train"}
-              <kbd aria-hidden="true">Space</kbd>
             </button>
           </span>
         )}
@@ -135,12 +137,10 @@ export function Toolbar({
             type="button"
             className="btn"
             disabled={blocked || running}
-            aria-keyshortcuts="Period"
-            title={blocked || running ? undefined : "One step (.)"}
+            title={blocked || running ? undefined : "One step. Period also steps while the network has focus."}
             onClick={() => send({ type: "step" })}
           >
             Step
-            <kbd aria-hidden="true">.</kbd>
           </button>
         </span>
         <span className="tip confirm-anchor" title={resetLocked ? reason : undefined}>
@@ -183,6 +183,7 @@ export function Toolbar({
             </div>
           )}
         </span>
+        <span className="divider" aria-hidden="true" />
         <span className="tip" title={connected ? undefined : reason}>
           <button
             type="button"
@@ -213,7 +214,16 @@ export function Toolbar({
             <small>{link}</small>
           </span>
         </div>
-        <p className="vitals" title={tooltip}>
+        <button
+          type="button"
+          className="machine-toggle"
+          aria-expanded={machine}
+          aria-controls="machine-vitals"
+          onClick={() => setMachine((open) => !open)}
+        >
+          {machine ? "Hide details" : "Details"}
+        </button>
+        <p id="machine-vitals" className={machine ? "vitals is-open" : "vitals"} title={tooltip}>
           <span>CPU {system ? formatPct(system.cpu) : "—"}</span>
           <span>Memory {memory}</span>
           {system?.gpuUtil != null && <span>GPU {system.gpuUtil}%</span>}

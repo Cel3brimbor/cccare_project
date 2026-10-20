@@ -1,4 +1,5 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react"
+import { usePrefers } from "./media"
 
 type RGB = [number, number, number]
 
@@ -44,6 +45,7 @@ export function PixelGrid({
   onSelect?: (index: number) => void
   maxSide?: number
 }) {
+  const dark = usePrefers("(prefers-color-scheme: dark)")
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layoutRef = useRef({ cell: 1 })
   const selectRef = useRef(onSelect)
@@ -91,7 +93,7 @@ export function PixelGrid({
       context.lineWidth = 1.5
       context.strokeRect(col * cell + 0.5, row * cell + 0.5, cell - 1, cell - 1)
     }
-  }, [values, side, mode, selected, maxSide])
+  }, [values, side, mode, selected, maxSide, dark])
 
   function pick(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!selectRef.current) return
@@ -126,6 +128,7 @@ export function FilterBank({
   onSelect: (unit: number) => void
   units?: number[]
 }) {
+  const dark = usePrefers("(prefers-color-scheme: dark)")
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layoutRef = useRef({ cols: 1, pitch: 1, units: 0 })
   const idsRef = useRef<number[]>([])
@@ -176,7 +179,7 @@ export function FilterBank({
         context.strokeRect(originX + 0.5, originY + 0.5, unitSize - 1, unitSize - 1)
       }
     }
-  }, [weight, side, selected, unitIds])
+  }, [weight, side, selected, unitIds, dark])
 
   function pick(event: ReactPointerEvent<HTMLCanvasElement>) {
     const layout = layoutRef.current

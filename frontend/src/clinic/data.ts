@@ -482,14 +482,19 @@ export function loadAdded(): Patient[] {
   }
 }
 
-export function saveAdded(patients: Patient[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(patients))
+export function saveAdded(patients: Patient[]): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(patients))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function makePatient(input: NewPatientInput, existing: Patient[]): Patient {
   return {
     ...input,
-    id: `local-${crypto.randomUUID()}`,
+    id: `local-${typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`,
     mrn: nextMrn(existing.map((patient) => patient.mrn)),
     source: "added",
   }
@@ -522,7 +527,9 @@ function isPatient(value: unknown): value is Patient {
       CONDITIONS.some((condition) => condition.id === patient.conditionId) &&
       typeof patient.adherence === "number" &&
       Array.isArray(patient.problems) &&
+      patient.problems.every((item) => typeof item === "string") &&
       Array.isArray(patient.medications) &&
+      patient.medications.every((item) => typeof item === "string") &&
       typeof patient.allergies === "string" &&
       typeof patient.note === "string" &&
       Array.isArray(patient.readings) &&

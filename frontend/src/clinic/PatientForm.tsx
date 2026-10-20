@@ -131,7 +131,15 @@ export function PatientForm({
               <ul>
                 {errorItems.map((field) => (
                   <li key={field}>
-                    <a href={`#patient-${field}`}>{errors[field]}</a>
+                    <a
+                      href={`#patient-${field}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        document.getElementById(`patient-${field}`)?.focus()
+                      }}
+                    >
+                      {errors[field]}
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -211,7 +219,7 @@ export function PatientForm({
               id="patient-latest"
               label={`Latest ${condition.measure.name}`}
               error={show("latest")}
-              hint={`From ${condition.measure.low} to ${condition.measure.high} ${condition.measure.unit}. Higher is worse.`}
+              hint={`From ${condition.measure.low} to ${condition.measure.high}${condition.measure.unit === "%" ? "%" : ` ${condition.measure.unit}`}. Higher is worse.`}
             >
               <input
                 id="patient-latest"

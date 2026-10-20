@@ -28,6 +28,7 @@ let state = initial
 const listeners = new Set<() => void>()
 let socket: WebSocket | null = null
 let reconnect: number | null = null
+let retryDelay = 800
 
 export let latestTrace: Trace | null = null
 
@@ -129,6 +130,30 @@ export function send(message: object) {
   }
 }
 
+const REQUIRED: Record<string, string> = {
+  config: "config",
+  trace: "trace",
+  error: "message",
+}
+
+function isMessage(value: unknown): value is ServerMessage {
+  if (!value || typeof value !== "object") return false
+  const type = (value as { type?: unknown }).type
+  if (typeof type !== "string") return false
+  const field = REQUIRED[type]
+  return !field || field in value
+}
+
+export function disconnect() {
+  if (reconnect !== null) window.clearTimeout(reconnect)
+  reconnect = null
+  retryDelay = 800
+  const current = socket
+  socket = null
+  current?.close()
+  commit({ ...state, connected: false })
+}
+
 export function connect() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return
@@ -138,17 +163,30 @@ export function connect() {
   socket = next
   next.onopen = () => {
     if (socket !== next) return
+    retryDelay = 800
     commit({ ...state, connected: true })
   }
   next.onmessage = (event) => {
     if (socket !== next) return
-    apply(JSON.parse(String(event.data)) as ServerMessage)
+    let message: unknown
+    try {
+      message = JSON.parse(String(event.data))
+    } catch {
+      return
+    }
+    if (!isMessage(message)) return
+    try {
+      apply(message)
+    } catch (error) {
+      console.warn("Ignored a malformed server message", error)
+    }
   }
   next.onclose = () => {
     if (socket !== next) return
     socket = null
     commit({ ...state, connected: false })
     if (reconnect !== null) window.clearTimeout(reconnect)
-    reconnect = window.setTimeout(connect, 800)
+    reconnect = window.setTimeout(connect, retryDelay)
+    retryDelay = Math.min(15000, retryDelay * 2)
   }
 }

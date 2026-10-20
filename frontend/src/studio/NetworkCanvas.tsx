@@ -3,6 +3,9 @@ import { weightLookup } from "./linalg"
 import { latestTrace } from "./store"
 import type { Selection, Trace } from "./types"
 
+const STRONG_PER_UNIT = 6
+const CANVAS_MONO = '11px "JetBrains Mono", ui-monospace, monospace'
+
 type RGB = [number, number, number]
 type Node = { x: number; y: number; layer: number; unit: number }
 type Particle = {
@@ -30,8 +33,19 @@ function parseColor(value: string): RGB {
   return [140, 140, 140]
 }
 
+const colorCache = new Map<string, string>()
+let themeVersion = 0
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  colorCache.clear()
+  themeVersion += 1
+})
+
 function cssColor(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+  const cached = colorCache.get(name)
+  if (cached) return cached
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  if (value) colorCache.set(name, value)
+  return value || fallback
 }
 
 function shownUnits(count: number): number[] {
@@ -107,6 +121,7 @@ export function NetworkCanvas({
     let sizeKey = ""
     let nodes: Node[] = []
     let buckets: { path: Path2D; color: string; alpha: number }[] = []
+    let edges: { source: Node; dest: Node; value: number; strength: number }[] = []
     const particles: Particle[] = []
     let last = performance.now()
     const hover = { layer: -1, unit: -1 }
@@ -167,6 +182,7 @@ export function NetworkCanvas({
         anchors.push(column)
       })
       buckets = []
+      edges = []
       const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
       if (!trace) return
       const positive = cssColor("--pos", "#b86a2e")
@@ -184,11 +200,11 @@ export function NetworkCanvas({
         }
         const scale = percentile(mags, 0.95)
         const groups = new Map<string, { path: Path2D; color: string; alpha: number }>()
-        const add = (source: Node, dest: Node, value: number) => {
-          const alpha = Math.pow(Math.min(1, Math.abs(value) / scale), 0.55) * 0.62
-          if (alpha < 0.035) return
+        const add = (source: Node, dest: Node, value: number, faint = false) => {
+          const alpha = faint ? 0.035 : Math.max(0.3, Math.pow(Math.min(1, Math.abs(value) / scale), 0.8) * 0.85)
           const color = value >= 0 ? positive : negative
-          const bucket = Math.round(alpha * 5) / 5
+          edges.push({ source, dest, value, strength: Math.min(1, Math.abs(value) / scale) })
+          const bucket = faint ? alpha : Math.round(alpha * 5) / 5
           const key = `${color}:${bucket}`
           let group = groups.get(key)
           if (!group) {
@@ -199,8 +215,11 @@ export function NetworkCanvas({
           group.path.lineTo(dest.x, dest.y)
         }
         if (drawAll) {
-          sources.forEach((source) => {
-            dests.forEach((dest) => add(source, dest, at(source.unit, dest.unit)))
+          dests.forEach((dest) => {
+            sources
+              .map((source) => ({ source, value: at(source.unit, dest.unit) }))
+              .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+              .forEach((entry, rank) => add(entry.source, dest, entry.value, rank >= STRONG_PER_UNIT))
           })
         } else {
           const fromImage = sources.length > MAX_SHOWN
@@ -249,6 +268,10 @@ export function NetworkCanvas({
       }
     }
 
+    let signature = ""
+    let activeUntil = 0
+    let themeSeen = themeVersion
+
     const draw = (now: number) => {
       const rect = wrap.getBoundingClientRect()
       const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -266,33 +289,74 @@ export function NetworkCanvas({
       }
       const rawTrace = latestTrace
       const key = `${sizesRef.current.join(",")}@${imageRef.current ?? 0}`
-      if (traceSeq !== (rawTrace?.seq ?? 0) || key !== sizeKey) {
+      if (traceSeq !== (rawTrace?.seq ?? 0) || key !== sizeKey || themeSeen !== themeVersion) {
+        themeSeen = themeVersion
         traceSeq = rawTrace?.seq ?? 0
         sizeKey = key
         rebuild()
+      }
+      const chosen = selectionRef.current
+      const next = `${width}x${height}|${traceSeq}|${sizeKey}|${hover.layer}:${hover.unit}|${chosen.layer}:${chosen.unit}|${colorCache.size}`
+      if (next !== signature) {
+        signature = next
+        activeUntil = now + 3000
+      } else if (now > activeUntil && particles.length === 0) {
+        last = now
+        frame = requestAnimationFrame(draw)
+        return
       }
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, width, height)
       const stage = cssColor("--stage", "#111113")
       context.fillStyle = stage
       context.fillRect(0, 0, width, height)
+      context.strokeStyle = cssColor("--grid", "rgba(0, 0, 0, 0.05)")
+      context.lineWidth = 1
+      context.beginPath()
+      for (let x = 0.5; x < width; x += 40) {
+        context.moveTo(x, 0)
+        context.lineTo(x, height)
+      }
+      for (let y = 0.5; y < height; y += 40) {
+        context.moveTo(0, y)
+        context.lineTo(width, y)
+      }
+      context.stroke()
       if (grid) {
         const origin = nodes.find((node) => node.layer === 0)
         if (origin) {
           const left = origin.x - cell / 2
           const top = origin.y - cell / 2
-          context.fillStyle = "#101012"
+          context.fillStyle = "#0e110b"
           context.beginPath()
-          context.roundRect(left - 8, top - 8, grid * cell + 16, grid * cell + 16, 12)
+          context.roundRect(left - 8, top - 8, grid * cell + 16, grid * cell + 16, 2)
           context.fill()
         }
       }
+      const focus = hover.layer >= 0 ? hover : null
       buckets.forEach((bucket) => {
-        context.globalAlpha = bucket.alpha
+        context.globalAlpha = focus ? bucket.alpha * 0.16 : bucket.alpha
         context.strokeStyle = bucket.color
         context.lineWidth = 1
         context.stroke(bucket.path)
       })
+      if (focus) {
+        const positiveInk = cssColor("--pos", "#4f6420")
+        const negativeInk = cssColor("--neg", "#3d5a6c")
+        context.lineWidth = 1.5
+        edges.forEach((edge) => {
+          const touches =
+            (edge.source.layer === focus.layer && edge.source.unit === focus.unit) ||
+            (edge.dest.layer === focus.layer && edge.dest.unit === focus.unit)
+          if (!touches) return
+          context.globalAlpha = Math.max(0.3, Math.pow(edge.strength, 0.7))
+          context.strokeStyle = edge.value >= 0 ? positiveInk : negativeInk
+          context.beginPath()
+          context.moveTo(edge.source.x, edge.source.y)
+          context.lineTo(edge.dest.x, edge.dest.y)
+          context.stroke()
+        })
+      }
       context.globalAlpha = 1
       const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
       const accent = parseColor(cssColor("--accent", "#0a84ff"))
@@ -300,6 +364,16 @@ export function NetworkCanvas({
       const ink = cssColor("--secondary", "#a1a1a6")
       const text = cssColor("--text", "#f5f5f7")
       const selected = selectionRef.current
+      const layerStats = new Map<number, { scale: number; count: number }>()
+      nodes.forEach((node) => {
+        const entry = layerStats.get(node.layer)
+        if (entry) entry.count += 1
+        else layerStats.set(node.layer, { scale: 0, count: 1 })
+      })
+      layerStats.forEach((entry, layer) => {
+        const values = nodes.filter((item) => item.layer === layer).map((item) => Math.abs(activationAt(trace, item.layer, item.unit)))
+        entry.scale = Math.max(0.2, percentile(values, 0.9))
+      })
       nodes.forEach((node) => {
         const value = activationAt(trace, node.layer, node.unit)
         const hot = selected.layer === node.layer && selected.unit === node.unit
@@ -319,9 +393,9 @@ export function NetworkCanvas({
           }
           return
         }
-        const layerValues = nodes.filter((item) => item.layer === node.layer).map((item) => Math.abs(activationAt(trace, item.layer, item.unit)))
-        const scale = Math.max(0.2, percentile(layerValues, 0.9))
-        const columnCount = nodes.filter((item) => item.layer === node.layer).length || 1
+        const stats = layerStats.get(node.layer)
+        const scale = stats?.scale ?? 0.2
+        const columnCount = stats?.count ?? 1
         const span = columnCount === 1 ? 40 : (height - 168) / (columnCount - 1)
         const radius = node.layer === sizesRef.current.length - 1 ? Math.min(12, span * 0.45) : Math.max(1.7, Math.min(6.5, span * 0.32))
         context.beginPath()
@@ -330,7 +404,7 @@ export function NetworkCanvas({
         context.fill()
         if (grid && node.layer === sizesRef.current.length - 1) {
           context.fillStyle = text
-          context.font = "12px system-ui, sans-serif"
+          context.font = CANVAS_MONO
           context.textAlign = "left"
           context.textBaseline = "middle"
           context.fillText(String(node.unit), node.x + radius + 6, node.y)
@@ -347,7 +421,7 @@ export function NetworkCanvas({
           context.globalAlpha = 1
         }
       })
-      context.font = "12px system-ui, sans-serif"
+      context.font = CANVAS_MONO
       context.textAlign = "center"
       titlesRef.current.forEach((title, layer) => {
         const column = nodes.filter((node) => node.layer === layer)
@@ -355,12 +429,12 @@ export function NetworkCanvas({
         const labelX =
           grid && layer === 0 ? column.reduce((sum, node) => sum + node.x, 0) / column.length : column[0].x
         context.fillStyle = selected.layer === layer ? text : ink
-        context.fillText(`${title}  ${sizesRef.current[layer]}`, labelX, labelY)
+        context.fillText(width < 520 ? title : `${title}  ${sizesRef.current[layer]}`, labelX, labelY)
       })
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       if (!reducedRef.current) {
-        spawn(dt)
+        if (now < activeUntil) spawn(dt)
         for (let index = particles.length - 1; index >= 0; index -= 1) {
           const particle = particles[index]
           particle.t += dt * particle.speed
@@ -378,7 +452,7 @@ export function NetworkCanvas({
         context.globalAlpha = 1
       }
       context.textAlign = "left"
-      context.font = "13px system-ui, sans-serif"
+      context.font = CANVAS_MONO
       context.fillStyle = ink
       const noun = trace?.task === "digits" ? "digit" : "review"
       const caption = !trace
@@ -399,13 +473,13 @@ export function NetworkCanvas({
               : grid && node.layer === sizesRef.current.length - 1
                 ? `Digit ${node.unit} · ${value.toFixed(3)}`
                 : `${titlesRef.current[node.layer] ?? "Unit"} ${node.unit + 1} · ${value.toFixed(3)}`
-          context.font = "12px system-ui, sans-serif"
+          context.font = CANVAS_MONO
           const box = context.measureText(label).width + 16
           const x = Math.min(width - box - 12, Math.max(12, node.x + 12))
           const y = Math.max(labelY + 8, node.y - 18)
           context.fillStyle = cssColor("--panel", "#1c1c1e")
           context.beginPath()
-          context.roundRect(x, y - 14, box, 22, 7)
+          context.roundRect(x, y - 14, box, 22, 2)
           context.fill()
           context.fillStyle = text
           context.fillText(label, x + 8, y + 1)
@@ -437,13 +511,20 @@ export function NetworkCanvas({
       canvas.style.cursor = node ? "pointer" : "default"
       if (event.type === "pointerdown" && node) onSelectRef.current({ layer: node.layer, unit: node.unit })
     }
+    const onLeave = () => {
+      hover.layer = -1
+      hover.unit = -1
+      canvas.style.cursor = "default"
+    }
     canvas.addEventListener("pointermove", onPointer)
     canvas.addEventListener("pointerdown", onPointer)
+    canvas.addEventListener("pointerleave", onLeave)
     frame = requestAnimationFrame(draw)
     return () => {
       cancelAnimationFrame(frame)
       canvas.removeEventListener("pointermove", onPointer)
       canvas.removeEventListener("pointerdown", onPointer)
+      canvas.removeEventListener("pointerleave", onLeave)
     }
   }, [])
 
@@ -474,8 +555,8 @@ export function NetworkCanvas({
         ref={canvasRef}
         className="network"
         tabIndex={0}
-        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
-        aria-label="Network graph. Arrow keys move the selected unit. The inspector follows."
+        aria-label="Network graph. Arrow keys move the selected unit and the inspector follows. Space trains or pauses, Period takes one step."
+        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Space Period"
         onKeyDown={onKey}
       />
       <p className="sr" aria-live="polite">

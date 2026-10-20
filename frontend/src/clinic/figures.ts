@@ -19,10 +19,11 @@ export type ChartLayout = {
   projected: PlacedPoint[]
   goal: { y: number; value: number } | null
   active: PlacedPoint | null
+  place: (values: number[]) => { x: number; y: number }[]
 }
 
-const CHART_WIDTH = 640
-const CHART_HEIGHT = 268
+const CHART_WIDTH = 960
+const CHART_HEIGHT = 360
 
 export function timeline(recorded: Reading[], forecast: { date: string; value: number }[]): ChartPoint[] {
   return [
@@ -37,32 +38,42 @@ export function layoutChart(
   activeIndex: number,
   tickLabel: (iso: string) => string,
   valueLabel: (value: number) => string,
+  width = CHART_WIDTH,
+  alternatives: number[][] = [],
 ): ChartLayout {
+  const narrow = width < 560
+  const height = narrow ? 300 : CHART_HEIGHT
   const values = points.map((point) => point.value)
   if (goalValue != null) values.push(goalValue)
+  alternatives.forEach((series) => values.push(...series))
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const pad = (max - min) * 0.14 || 1
-  const yMin = min - pad
-  const yMax = max + pad
-  const plot = { left: 56, right: 16, top: 18, bottom: 36 }
-  const innerW = CHART_WIDTH - plot.left - plot.right
-  const innerH = CHART_HEIGHT - plot.top - plot.bottom
+  const range = max - min || 1
+  const rough = range / 3
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)))
+  const norm = rough / magnitude
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * magnitude
+  const yMin = Math.floor((min - range * 0.06) / step) * step
+  const yMax = Math.ceil((max + range * 0.06) / step) * step
+  const plot = { left: 40, right: narrow ? 12 : 136, top: 32, bottom: 40 }
+  const innerW = width - plot.left - plot.right
+  const innerH = height - plot.top - plot.bottom
   const yOf = (value: number) => plot.top + ((yMax - value) / (yMax - yMin)) * innerH
   const xOf = (index: number) => plot.left + (points.length === 1 ? innerW / 2 : (index / (points.length - 1)) * innerW)
   const placed = points.map((point, index) => ({ ...point, x: xOf(index), y: yOf(point.value) }))
   const recorded = placed.filter((point) => point.kind === "recorded")
   const lastRecorded = recorded[recorded.length - 1]
   const projected = lastRecorded ? [lastRecorded, ...placed.filter((point) => point.kind === "projected")] : []
-  const yTicks = [yMax, (yMax + yMin) / 2, yMin].map((value) => ({ y: yOf(value), label: valueLabel(value) }))
+  const yTicks: { y: number; label: string }[] = []
+  for (let value = yMin; value <= yMax + step / 2; value += step) yTicks.push({ y: yOf(value), label: valueLabel(value) })
   const tickIndexes = [0, Math.max(0, recorded.length - 1), points.length - 1]
   const xTicks = [...new Set(tickIndexes)].map((index) => ({
     x: xOf(index),
     label: tickLabel(points[index].date),
   }))
   return {
-    width: CHART_WIDTH,
-    height: CHART_HEIGHT,
+    width,
+    height,
     plot,
     yTicks,
     xTicks,
@@ -70,6 +81,11 @@ export function layoutChart(
     projected,
     goal: goalValue == null ? null : { y: yOf(goalValue), value: goalValue },
     active: placed[clampIndex(activeIndex, placed.length)] ?? null,
+    place: (series) => {
+      const start = Math.max(0, recorded.length - 1)
+      const head = lastRecorded ? [{ x: lastRecorded.x, y: lastRecorded.y }] : []
+      return [...head, ...series.map((value, index) => ({ x: xOf(start + 1 + index), y: yOf(value) }))]
+    },
   }
 }
 

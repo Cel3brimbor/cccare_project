@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react"
+import { usePrefers } from "./media"
 import { cssColor } from "./color"
 import { useStudio } from "./store"
 
 export function Charts() {
+  const dark = usePrefers("(prefers-color-scheme: dark)")
   const metrics = useStudio().metrics
   const lossRef = useRef<HTMLCanvasElement>(null)
   const accRef = useRef<HTMLCanvasElement>(null)
@@ -28,7 +30,7 @@ export function Charts() {
       0,
       1,
     )
-  }, [history])
+  }, [history, dark])
 
   const points = history?.length ?? 0
   const lossLabel =

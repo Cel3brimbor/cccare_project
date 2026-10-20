@@ -136,11 +136,7 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="sheet-head">
         <div>
           <h2 id={titleId}>{task === "digits" ? "Draw a digit" : "Try a review"}</h2>
-          <p>
-            {task === "digits"
-              ? "Paint the grid. The reply is the digit with the highest probability."
-              : "1 is positive, 0 is negative. The reply is the sigmoid of one logit."}
-          </p>
+          {task === "digits" ? <p>Paint the grid. The reply is the digit with the highest probability.</p> : null}
         </div>
         <button
           type="button"
@@ -165,10 +161,13 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
         {messages.map((message) => (
           <div key={message.id} className="exchange">
             <p className="bubble user">{message.text}</p>
-            <div className="bubble net">
-              <strong>{message.pred}</strong>
+            <div className={message.pred === 1 ? "bubble net is-positive" : "bubble net is-negative"}>
+              <strong>{message.pred === 1 ? "Positive" : "Negative"}</strong>
+              <i className="prob-bar" aria-hidden="true">
+                <b style={{ width: `${Math.round(message.prob * 100)}%` }} />
+              </i>
               <span>
-                {message.pred === 1 ? "Positive" : "Negative"} · {formatNum(message.prob, 3)}
+                Output {message.pred}, {Math.round(message.prob * 100)}% positive
               </span>
               <small>
                 σ({formatNum(message.logit, 3)}) = {formatNum(message.prob, 3)}
@@ -180,9 +179,9 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
         ))}
         <div ref={endRef} />
       </div>
-      <div className="suggestions">
-        {samples.map((sample) => (
-          <button key={sample} type="button" className="text-button" disabled={!ready} onClick={() => submit(sample)}>
+      <div className="suggestions" role="group" aria-label="Example reviews">
+        {samples.filter((sample) => !messages.some((message) => message.text === sample)).map((sample) => (
+          <button key={sample} type="button" className="sample" disabled={!ready} onClick={() => submit(sample)}>
             {sample}
           </button>
         ))}
