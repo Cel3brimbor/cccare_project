@@ -136,11 +136,7 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="sheet-head">
         <div>
           <h2 id={titleId}>{task === "digits" ? "Draw a digit" : "Try a review"}</h2>
-          <p>
-            {task === "digits"
-              ? "Paint the grid. The reply is the digit with the highest probability."
-              : "1 is positive, 0 is negative. The reply is the sigmoid of one logit."}
-          </p>
+          {task === "digits" ? <p>Paint the grid. The reply is the digit with the highest probability.</p> : null}
         </div>
         <button
           type="button"

@@ -289,7 +289,9 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                                 ? itemLatest.value.toFixed(itemCondition.measure.decimals)
                                 : formatMeasure(itemLatest.value, itemCondition.measure)}
                             </span>
-                            <span className="c-patient-meta">{itemCondition.name}</span>
+                            <span className="c-patient-meta" title={itemCondition.name}>
+                              {itemCondition.name}
+                            </span>
                             <Sparkline readings={item.readings} />
                           </button>
                         </li>
@@ -393,8 +395,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                       {formatMeasure(selected.explanation.futureNative, condition.measure)}
                     </dd>
                     <dd className="c-meta">
-                      {Math.round(selected.explanation.probability * 100)}% chance of a {formatGoal(condition.measure)} drop
-                      on the selected option.
+                      On the selected option.
                     </dd>
                   </div>
                 </dl>
@@ -627,7 +628,9 @@ function lead(
     bestChance >= 50
       ? `Best chance: ${lowerFirst(best.treatment.name)}, ${bestChance}%.`
       : `No option is likely to bring a drop of ${goalText}. Best chance: ${lowerFirst(best.treatment.name)}, ${bestChance}%.`
-  const which = selected.treatment.id === best.treatment.id ? `Selected, best of ${ranked.length}` : "Selected"
-  const detail = `${which}: ${lowerFirst(selected.treatment.name)}. Projected ${formatMeasure(future, measure)} in 12 weeks, ${landing}. ${chance}% chance of a drop of at least ${goalText}.`
+  const detail =
+    selected.treatment.id === best.treatment.id
+      ? `Projected ${formatMeasure(future, measure)} in 12 weeks, ${landing}.`
+      : `Selected: ${lowerFirst(selected.treatment.name)}, ${chance}%. Projected ${formatMeasure(future, measure)} in 12 weeks, ${landing}.`
   return { headline, detail }
 }

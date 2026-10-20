@@ -62,6 +62,7 @@ export function TrendChart({
   }, [])
 
   const describe = useId()
+  const [touched, setTouched] = useState(false)
   const inset = chart.plot.right < 60
   const labelX = inset ? plotRight - 6 : plotRight + 12
   const labelAnchor = inset ? "end" : "start"
@@ -81,6 +82,7 @@ export function TrendChart({
     }
     if (!(event.key in moves)) return
     event.preventDefault()
+    setTouched(true)
     setIndex(Math.min(last, Math.max(0, moves[event.key])))
   }
 
@@ -88,6 +90,7 @@ export function TrendChart({
     const box = event.currentTarget.getBoundingClientRect()
     const x = ((event.clientX - box.left) / box.width) * chart.width
     if (points.length < 2) return
+    setTouched(true)
     const next = Math.round(((x - chart.plot.left) / innerW) * (points.length - 1))
     setIndex(Math.min(points.length - 1, Math.max(0, next)))
   }
@@ -171,7 +174,7 @@ export function TrendChart({
                 </text>
               </g>
             ) : null}
-            {alternatives.map((item) => {
+            {alternatives.filter((item) => !inset || item.id === highlightId).map((item) => {
               const line = pathOf(chart.place(item.values))
               const lit = item.id === highlightId
               return (
@@ -224,12 +227,12 @@ export function TrendChart({
                   <circle r={7} className="c-active-point" />
                   <path d="M -15 0 H -9 M 9 0 H 15 M 0 -15 V -9 M 0 9 V 15" />
                   <text
-                    x={chart.active.x > plotRight - 60 ? -14 : 14}
+                    x={chart.active.x > plotRight - 90 ? -14 : 14}
                     y={-12}
-                    textAnchor={chart.active.x > plotRight - 60 ? "end" : "start"}
+                    textAnchor={chart.active.x > plotRight - 90 ? "end" : "start"}
                     className="c-active-label"
                   >
-                    {formatMeasure(chart.active.value, measure)}
+                    {formatDay(chart.active.date)} {formatMeasure(chart.active.value, measure)}
                   </text>
                 </motion.g>
               </g>
@@ -237,18 +240,7 @@ export function TrendChart({
           </svg>
         )}
       </div>
-      <div className="c-reader">
-        <p className="c-hint">Move across the chart, or focus it and use the arrow keys.</p>
-        {active ? (
-          <p className="c-point">
-            <span className="c-point-date">{formatDate(active.date)}</span>
-            <span className={active.kind === "projected" ? "c-point-value is-projected" : "c-point-value"}>
-              {formatMeasure(active.value, measure)}
-            </span>
-            <span className="c-point-kind">{active.kind === "recorded" ? "Recorded" : "Projected"}</span>
-          </p>
-        ) : null}
-      </div>
+      {touched ? null : <p className="c-hint c-reader">Move across the chart, or focus it and use the arrow keys.</p>}
       <details className="c-disclose">
         <summary>
           All readings: {recorded.length} recorded, {forecast.length} projected

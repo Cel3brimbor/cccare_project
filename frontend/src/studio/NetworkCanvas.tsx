@@ -3,6 +3,7 @@ import { weightLookup } from "./linalg"
 import { latestTrace } from "./store"
 import type { Selection, Trace } from "./types"
 
+const STRONG_PER_UNIT = 6
 const CANVAS_MONO = '11px "JetBrains Mono", ui-monospace, monospace'
 
 type RGB = [number, number, number]
@@ -186,11 +187,10 @@ export function NetworkCanvas({
         }
         const scale = percentile(mags, 0.95)
         const groups = new Map<string, { path: Path2D; color: string; alpha: number }>()
-        const add = (source: Node, dest: Node, value: number) => {
-          const alpha = Math.pow(Math.min(1, Math.abs(value) / scale), 1.6) * 0.75
-          if (alpha < 0.04) return
+        const add = (source: Node, dest: Node, value: number, faint = false) => {
+          const alpha = faint ? 0.035 : Math.max(0.3, Math.pow(Math.min(1, Math.abs(value) / scale), 0.8) * 0.85)
           const color = value >= 0 ? positive : negative
-          const bucket = Math.round(alpha * 5) / 5
+          const bucket = faint ? alpha : Math.round(alpha * 5) / 5
           const key = `${color}:${bucket}`
           let group = groups.get(key)
           if (!group) {
@@ -201,8 +201,11 @@ export function NetworkCanvas({
           group.path.lineTo(dest.x, dest.y)
         }
         if (drawAll) {
-          sources.forEach((source) => {
-            dests.forEach((dest) => add(source, dest, at(source.unit, dest.unit)))
+          dests.forEach((dest) => {
+            sources
+              .map((source) => ({ source, value: at(source.unit, dest.unit) }))
+              .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+              .forEach((entry, rank) => add(entry.source, dest, entry.value, rank >= STRONG_PER_UNIT))
           })
         } else {
           const fromImage = sources.length > MAX_SHOWN

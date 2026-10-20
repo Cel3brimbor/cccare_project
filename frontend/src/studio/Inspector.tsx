@@ -33,6 +33,7 @@ export function Inspector({
   return (
     <aside className="inspector">
       <div className="inspector-head">
+        <p className="inspector-label">Layer</p>
         <Segmented
           label="Layer"
           className="layer-switch"
