@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { CheckCircle, DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
+import { CommandPalette, type PaletteAction } from "./CommandPalette"
 import { NetworkPanel } from "./NetworkPanel"
 import { PatientForm } from "./PatientForm"
 import { TrendChart } from "./TrendChart"
@@ -23,10 +24,14 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
   const [formOpen, setFormOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [treatmentId, setTreatmentId] = useState<string | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const [unitId, setUnitId] = useState("out-1")
   const [armed, setArmed] = useState(false)
   const [status, setStatus] = useState("")
+  const [toast, setToast] = useState(0)
+  const toastTimer = useRef<number | undefined>(undefined)
   const newButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const patients = useMemo(() => [...MOCK_PATIENTS, ...added], [added])
@@ -59,6 +64,8 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
 
   useEffect(() => {
     setArmed(false)
+    setTreatmentId(null)
+    setHoverId(null)
   }, [patient?.id])
 
   useEffect(() => {
@@ -70,11 +77,47 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     requestAnimationFrame(() => newButton.current?.focus())
   }, [])
 
-  function select(id: string) {
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT" || target?.isContentEditable
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        if (!formOpen) setPaletteOpen((open) => !open)
+      } else if (event.key === "/" && !typing && !formOpen) {
+        event.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [formOpen])
+
+  function select(id: string, focusChart = true) {
     setPatientId(id)
     const next = `#/patients/${encodeURIComponent(id)}`
     if (window.location.hash !== next) window.location.hash = next
-    requestAnimationFrame(() => heading.current?.focus())
+    if (focusChart) requestAnimationFrame(() => heading.current?.focus())
+  }
+
+  function stepThrough(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    const target = event.target as HTMLElement
+    if (!target.classList.contains("c-patient")) return
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>(".c-patient")]
+    const index = buttons.indexOf(target as HTMLButtonElement)
+    const next = buttons[index + (event.key === "ArrowDown" ? 1 : -1)]
+    if (!next) return
+    event.preventDefault()
+    next.focus()
+    if (next.dataset.id) select(next.dataset.id, false)
+  }
+
+  function announce(text: string) {
+    setStatus(text)
+    setToast((count) => count + 1)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setStatus(""), 4500)
   }
 
   function create(input: NewPatientInput) {
@@ -83,7 +126,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     setAdded(next)
     saveAdded(next)
     setFormOpen(false)
-    setStatus(`Added ${fullName(created)} to the panel.`)
+    announce(`Added ${fullName(created)} to the panel.`)
     select(created.id)
   }
 
@@ -92,7 +135,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     setAdded(next)
     saveAdded(next)
     setArmed(false)
-    setStatus(`Removed ${fullName(target)} from this browser.`)
+    announce(`Removed ${fullName(target)} from this browser.`)
     const fallback = patients.find((item) => item.id !== target.id)
     if (fallback) select(fallback.id)
   }
@@ -108,7 +151,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
-    setStatus(`Downloaded a projection file for ${fullName(patient)}.`)
+    announce(`Downloaded a projection file for ${fullName(patient)}.`)
   }
 
   const groups = (["Worsening", "Stable", "Improving"] as Course[])
@@ -120,21 +163,48 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     }))
     .filter((group) => group.items.length > 0)
 
+  const paletteActions: PaletteAction[] = [
+    { id: "new", label: "New patient", hint: "Add a record to this browser", run: () => setFormOpen(true) },
+    ...(patient
+      ? [{ id: "export", label: "Export for the patient", hint: `Download ${fullName(patient)}'s projection`, run: download }]
+      : []),
+    {
+      id: "worsening",
+      label: "Show worsening patients",
+      hint: "Filter the list",
+      run: () => {
+        setQuery("")
+        setFilter("worsening")
+      },
+    },
+    { id: "bench", label: "Open the training bench", hint: "Train and inspect the network", run: onOpenBench },
+  ]
+
   return (
     <div className="clinic">
       <a className="c-skip" href="#patient-chart">
         Skip to chart
       </a>
-      <div className="sr" aria-live="polite">
-        {status}
+      <div className="c-toast-region" role="status" aria-live="polite">
+        {status ? (
+          <p key={toast} className="c-toast">
+            <CheckCircle size={18} weight="fill" aria-hidden="true" />
+            {status}
+          </p>
+        ) : null}
       </div>
-      <div className="c-shell" inert={formOpen}>
+      <div className="c-shell" inert={formOpen || paletteOpen}>
         <header className="c-topbar">
           <div className="c-brand">
             <Pulse size={22} weight="bold" aria-hidden="true" />
             <p className="c-brand-name">Meridian Clinical</p>
             <p className="c-brand-sub">Outpatient panel, 20 Oct 2026</p>
           </div>
+          <button type="button" className="c-jump" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K /">
+            <MagnifyingGlass size={16} aria-hidden="true" />
+            <span>Go to a patient or action</span>
+            <kbd>{/Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K"}</kbd>
+          </button>
           <div className="c-actions">
             <button type="button" className="c-btn c-btn-quiet" onClick={onOpenBench}>
               Training bench
@@ -146,7 +216,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
           </div>
         </header>
         <div className="c-frame">
-          <aside className="c-census" aria-label="Patients">
+          <aside className="c-census" aria-label="Patients" onKeyDown={stepThrough}>
             <div className="c-census-tools">
               <label className="c-search" htmlFor="patient-search">
                 <MagnifyingGlass size={18} aria-hidden="true" />
@@ -199,6 +269,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                             type="button"
                             className={`c-patient is-${group.name.toLowerCase()}`}
                             aria-current={item.id === patient?.id ? "true" : undefined}
+                            data-id={item.id}
                             onClick={() => select(item.id)}
                           >
                             <span className="c-patient-name">{fullName(item)}</span>
@@ -236,7 +307,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
               </div>
             ) : null}
             {patient && condition && latest && selected ? (
-              <div className="c-chart-page">
+              <div className="c-chart-page" key={patient.id}>
                 <header className="c-identity">
                   <div className="c-identity-copy">
                     <h1 id="patient-chart" tabIndex={-1} ref={heading}>
@@ -312,26 +383,35 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                     </dd>
                   </div>
                 </dl>
-                <section className="c-sheet c-course" aria-labelledby="course-heading">
-                  <div className="c-sheet-head">
-                    <h2 id="course-heading">Course and projection</h2>
-                    <p className="c-lead" aria-live="polite">
-                      {lead(patient.given, condition.measure.name, selected, ranked, condition.measure)}
+                <div className="c-decide">
+                  <section className="c-sheet c-course" aria-labelledby="course-heading">
+                    <div className="c-sheet-head">
+                      <h2 id="course-heading">Course and projection</h2>
+                      <p className="c-lead" aria-live="polite">
+                        {lead(patient.given, condition.measure.name, selected, ranked, condition.measure)}
+                      </p>
+                    </div>
+                    <TrendChart
+                      key={patient.id}
+                      recorded={patient.readings}
+                      forecast={selected.forecast}
+                      measure={condition.measure}
+                      treatmentName={selected.treatment.name}
+                      alternatives={ranked
+                        .filter((item) => item.treatment.id !== selected.treatment.id)
+                        .map((item) => ({
+                          id: item.treatment.id,
+                          name: item.treatment.name,
+                          values: item.forecast.map((point) => point.value),
+                        }))}
+                      highlightId={hoverId}
+                      onChoose={setTreatmentId}
+                    />
+                    <p className="c-banner" role="note">
+                      Synthetic record. The projection is a fixed six-input network for a conversation, not a device
+                      cleared for diagnosis or treatment, and it was not trained on these charts.
                     </p>
-                  </div>
-                  <TrendChart
-                    key={`${patient.id}-${selected.treatment.id}`}
-                    recorded={patient.readings}
-                    forecast={selected.forecast}
-                    measure={condition.measure}
-                    treatmentName={selected.treatment.name}
-                  />
-                  <p className="c-banner" role="note">
-                    Synthetic record. The projection is a fixed six-input network for a conversation, not a device
-                    cleared for diagnosis or treatment, and it was not trained on these charts.
-                  </p>
-                </section>
-                <div className="c-pair">
+                  </section>
                   <section className="c-sheet c-options-sheet" aria-labelledby="options-heading">
                     <h2 id="options-heading">Treatment options</h2>
                     <p className="c-meta">
@@ -344,7 +424,12 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                         const on = item.treatment.id === selected.treatment.id
                         const chance = Math.round(item.explanation.probability * 100)
                         return (
-                          <label key={item.treatment.id} className={on ? "c-option is-on" : "c-option"}>
+                          <label
+                            key={item.treatment.id}
+                            className={on ? "c-option is-on" : "c-option"}
+                            onPointerEnter={() => setHoverId(item.treatment.id)}
+                            onPointerLeave={() => setHoverId(null)}
+                          >
                             <input
                               type="radio"
                               name="treatment"
@@ -373,36 +458,36 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                       })}
                     </fieldset>
                   </section>
-                  <section className="c-sheet c-record" aria-labelledby="record-heading">
-                    <h2 id="record-heading">On the record</h2>
-                    <dl className="c-facts">
-                      <div>
-                        <dt>Problems</dt>
-                        <dd>
-                          <ul>
-                            {[condition.name, ...patient.problems].map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Medicines</dt>
-                        <dd>
-                          <ul>
-                            {patient.medications.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Note</dt>
-                        <dd className="c-note">{patient.note || "No note on the record."}</dd>
-                      </div>
-                    </dl>
-                  </section>
                 </div>
+                <section className="c-sheet c-record" aria-labelledby="record-heading">
+                  <h2 id="record-heading">On the record</h2>
+                  <dl className="c-facts">
+                    <div>
+                      <dt>Problems</dt>
+                      <dd>
+                        <ul>
+                          {[condition.name, ...patient.problems].map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Medicines</dt>
+                      <dd>
+                        <ul>
+                          {patient.medications.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Note</dt>
+                      <dd className="c-note">{patient.note || "No note on the record."}</dd>
+                    </div>
+                  </dl>
+                </section>
                 <NetworkPanel
                   projection={selected}
                   measure={condition.measure}
@@ -415,6 +500,14 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
         </div>
       </div>
       {formOpen ? <PatientForm onClose={closeForm} onCreate={create} /> : null}
+      {paletteOpen ? (
+        <CommandPalette
+          patients={orderPatients(patients, "all", "")}
+          actions={paletteActions}
+          onPick={(id) => select(id)}
+          onClose={() => setPaletteOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -435,7 +528,7 @@ function Sparkline({ readings }: { readings: { value: number }[] }) {
   return (
     <svg className="c-spark" viewBox="-2 0 78 20" aria-hidden="true">
       <polyline points={points} />
-      <circle cx={last[0]} cy={last[1]} r={2.2} />
+      <rect x={Number(last[0]) - 2} y={Number(last[1]) - 2} width={4} height={4} />
     </svg>
   )
 }

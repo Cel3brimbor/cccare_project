@@ -3,6 +3,8 @@ import { weightLookup } from "./linalg"
 import { latestTrace } from "./store"
 import type { Selection, Trace } from "./types"
 
+const CANVAS_MONO = '11px "JetBrains Mono", ui-monospace, monospace'
+
 type RGB = [number, number, number]
 type Node = { x: number; y: number; layer: number; unit: number }
 type Particle = {
@@ -276,14 +278,26 @@ export function NetworkCanvas({
       const stage = cssColor("--stage", "#111113")
       context.fillStyle = stage
       context.fillRect(0, 0, width, height)
+      context.strokeStyle = cssColor("--grid", "rgba(0, 0, 0, 0.05)")
+      context.lineWidth = 1
+      context.beginPath()
+      for (let x = 0.5; x < width; x += 40) {
+        context.moveTo(x, 0)
+        context.lineTo(x, height)
+      }
+      for (let y = 0.5; y < height; y += 40) {
+        context.moveTo(0, y)
+        context.lineTo(width, y)
+      }
+      context.stroke()
       if (grid) {
         const origin = nodes.find((node) => node.layer === 0)
         if (origin) {
           const left = origin.x - cell / 2
           const top = origin.y - cell / 2
-          context.fillStyle = "#101012"
+          context.fillStyle = "#0e110b"
           context.beginPath()
-          context.roundRect(left - 8, top - 8, grid * cell + 16, grid * cell + 16, 12)
+          context.roundRect(left - 8, top - 8, grid * cell + 16, grid * cell + 16, 2)
           context.fill()
         }
       }
@@ -330,7 +344,7 @@ export function NetworkCanvas({
         context.fill()
         if (grid && node.layer === sizesRef.current.length - 1) {
           context.fillStyle = text
-          context.font = "12px system-ui, sans-serif"
+          context.font = CANVAS_MONO
           context.textAlign = "left"
           context.textBaseline = "middle"
           context.fillText(String(node.unit), node.x + radius + 6, node.y)
@@ -347,7 +361,7 @@ export function NetworkCanvas({
           context.globalAlpha = 1
         }
       })
-      context.font = "12px system-ui, sans-serif"
+      context.font = CANVAS_MONO
       context.textAlign = "center"
       titlesRef.current.forEach((title, layer) => {
         const column = nodes.filter((node) => node.layer === layer)
@@ -378,7 +392,7 @@ export function NetworkCanvas({
         context.globalAlpha = 1
       }
       context.textAlign = "left"
-      context.font = "13px system-ui, sans-serif"
+      context.font = CANVAS_MONO
       context.fillStyle = ink
       const noun = trace?.task === "digits" ? "digit" : "review"
       const caption = !trace
@@ -399,13 +413,13 @@ export function NetworkCanvas({
               : grid && node.layer === sizesRef.current.length - 1
                 ? `Digit ${node.unit} · ${value.toFixed(3)}`
                 : `${titlesRef.current[node.layer] ?? "Unit"} ${node.unit + 1} · ${value.toFixed(3)}`
-          context.font = "12px system-ui, sans-serif"
+          context.font = CANVAS_MONO
           const box = context.measureText(label).width + 16
           const x = Math.min(width - box - 12, Math.max(12, node.x + 12))
           const y = Math.max(labelY + 8, node.y - 18)
           context.fillStyle = cssColor("--panel", "#1c1c1e")
           context.beginPath()
-          context.roundRect(x, y - 14, box, 22, 7)
+          context.roundRect(x, y - 14, box, 22, 2)
           context.fill()
           context.fillStyle = text
           context.fillText(label, x + 8, y + 1)

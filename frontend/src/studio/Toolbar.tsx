@@ -76,7 +76,7 @@ export function Toolbar({
   return (
     <header className="toolbar" aria-busy={busy}>
       <div className="brand">
-        <strong>Network</strong>
+        <strong>Training bench</strong>
         <span>{task === "digits" ? "Handwritten digits" : "IMDB reviews"}</span>
       </div>
       <Segmented

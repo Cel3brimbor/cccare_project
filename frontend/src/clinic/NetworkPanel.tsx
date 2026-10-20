@@ -47,7 +47,8 @@ export function NetworkPanel({
               )
             })}
             {diagram.nodes.map((node) => (
-              <g key={node.id}>
+              <g key={node.id} className="c-node-hit" onClick={() => onUnit(node.id)}>
+                <title>Inspect {node.label}</title>
                 <circle cx={node.x} cy={node.y} r={16} className={node.id === unit.id ? "c-node on" : "c-node"} />
                 {node.anchor === "middle" ? (
                   <rect x={node.textX - 62} y={node.textY - 12} width={124} height={16} className="c-label-chip" />
@@ -58,6 +59,15 @@ export function NetworkPanel({
               </g>
             ))}
           </svg>
+          <ul className="c-legend">
+            <li>
+              <i className="c-swatch pos" aria-hidden="true" /> Positive weight
+            </li>
+            <li>
+              <i className="c-swatch neg" aria-hidden="true" /> Negative weight
+            </li>
+            <li>Thicker lines carry larger weights. Select a node to inspect it.</li>
+          </ul>
         </div>
         <div className="c-inspect">
           <label className="c-field" htmlFor="inspect-unit">
@@ -81,15 +91,6 @@ export function NetworkPanel({
           <UnitMath unitId={unit.id} projection={projection} measure={measure} />
         </div>
       </div>
-      <ul className="c-legend">
-        <li>
-          <i className="c-swatch pos" aria-hidden="true" /> Positive weight
-        </li>
-        <li>
-          <i className="c-swatch neg" aria-hidden="true" /> Negative weight
-        </li>
-        <li>Thicker lines carry larger weights.</li>
-      </ul>
       <details className="c-disclose">
         <summary>Inputs and weights for {projection.treatment.name}</summary>
         <h3>Inputs used for {projection.treatment.name}</h3>

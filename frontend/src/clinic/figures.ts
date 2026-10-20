@@ -19,6 +19,7 @@ export type ChartLayout = {
   projected: PlacedPoint[]
   goal: { y: number; value: number } | null
   active: PlacedPoint | null
+  place: (values: number[]) => { x: number; y: number }[]
 }
 
 const CHART_WIDTH = 960
@@ -38,11 +39,13 @@ export function layoutChart(
   tickLabel: (iso: string) => string,
   valueLabel: (value: number) => string,
   width = CHART_WIDTH,
+  alternatives: number[][] = [],
 ): ChartLayout {
   const narrow = width < 560
   const height = narrow ? 300 : CHART_HEIGHT
   const values = points.map((point) => point.value)
   if (goalValue != null) values.push(goalValue)
+  alternatives.forEach((series) => values.push(...series))
   const min = Math.min(...values)
   const max = Math.max(...values)
   const pad = (max - min) * 0.18 || 1
@@ -73,6 +76,11 @@ export function layoutChart(
     projected,
     goal: goalValue == null ? null : { y: yOf(goalValue), value: goalValue },
     active: placed[clampIndex(activeIndex, placed.length)] ?? null,
+    place: (series) => {
+      const start = Math.max(0, recorded.length - 1)
+      const head = lastRecorded ? [{ x: lastRecorded.x, y: lastRecorded.y }] : []
+      return [...head, ...series.map((value, index) => ({ x: xOf(start + 1 + index), y: yOf(value) }))]
+    },
   }
 }
 
