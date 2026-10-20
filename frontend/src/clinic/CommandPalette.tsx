@@ -59,9 +59,7 @@ export function CommandPalette({
   const safeCursor = Math.min(cursor, Math.max(0, rows.length - 1))
 
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
     input.current?.focus()
-    return () => previous?.focus?.()
   }, [])
 
   useEffect(() => {
@@ -70,9 +68,9 @@ export function CommandPalette({
 
   function run(row: Row | undefined) {
     if (!row) return
-    onClose()
     if (row.kind === "patient") onPick(row.patient.id)
-    else row.action.run()
+    onClose()
+    if (row.kind === "action") row.action.run()
   }
 
   function onKey(event: KeyboardEvent<HTMLInputElement>) {

@@ -22,7 +22,7 @@ export function TrendChart({
   onChoose?: (id: string) => void
 }) {
   const reduced = useReducedMotion()
-  const spring = reduced ? { duration: 0 } : { type: "spring" as const, bounce: 0, duration: 0.55 }
+  const settled = useRef<number | null>(null)
   const points = useMemo(() => timeline(recorded, forecast), [recorded, forecast])
   const [index, setIndex] = useState(() => Math.max(0, recorded.length - 1))
   const safeIndex = Math.min(points.length - 1, Math.max(0, index))
@@ -62,11 +62,18 @@ export function TrendChart({
   }, [])
 
   const describe = useId()
+  const resized = settled.current !== frameWidth
+  const spring = reduced || resized ? { duration: 0 } : { type: "spring" as const, bounce: 0, duration: 0.55 }
+  const touch = typeof window !== "undefined" && window.matchMedia("(hover: none)").matches
   const [touched, setTouched] = useState(false)
   const inset = chart.plot.right < 60
   const labelX = inset ? plotRight - 6 : plotRight + 12
   const labelAnchor = inset ? "end" : "start"
   const labelLift = inset ? -12 : 4
+
+  useLayoutEffect(() => {
+    settled.current = frameWidth
+  })
 
   function key(event: KeyboardEvent<HTMLDivElement>) {
     const last = points.length - 1
@@ -240,7 +247,9 @@ export function TrendChart({
           </svg>
         )}
       </div>
-      {touched ? null : <p className="c-hint c-reader">Move across the chart, or focus it and use the arrow keys.</p>}
+      {touched ? null : <p className="c-hint c-reader">
+          {touch ? "Drag across the chart to read a week." : "Move across the chart, or focus it and use the arrow keys."}
+        </p>}
       <details className="c-disclose">
         <summary>
           All readings: {recorded.length} recorded, {forecast.length} projected

@@ -28,6 +28,7 @@ let state = initial
 const listeners = new Set<() => void>()
 let socket: WebSocket | null = null
 let reconnect: number | null = null
+let retryDelay = 800
 
 export let latestTrace: Trace | null = null
 
@@ -138,6 +139,7 @@ export function connect() {
   socket = next
   next.onopen = () => {
     if (socket !== next) return
+    retryDelay = 800
     commit({ ...state, connected: true })
   }
   next.onmessage = (event) => {
@@ -149,6 +151,7 @@ export function connect() {
     socket = null
     commit({ ...state, connected: false })
     if (reconnect !== null) window.clearTimeout(reconnect)
-    reconnect = window.setTimeout(connect, 800)
+    reconnect = window.setTimeout(connect, retryDelay)
+    retryDelay = Math.min(15000, retryDelay * 2)
   }
 }

@@ -47,6 +47,9 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   const toastTimer = useRef<number | undefined>(undefined)
   const newButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
+  const main = useRef<HTMLElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const returnFocus = useRef<"opener" | "chart" | null>(null)
   const patients = useMemo(() => [...MOCK_PATIENTS, ...added], [added])
   const visible = useMemo(() => orderPatients(patients, filter, query), [patients, filter, query])
 
@@ -80,6 +83,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     setArmed(false)
     setTreatmentId(null)
     setHoverId(null)
+    main.current?.scrollTo({ top: 0 })
   }, [patient?.id])
 
   useEffect(() => {
@@ -97,15 +101,26 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT" || target?.isContentEditable
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
-        if (!formOpen) setPaletteOpen((open) => !open)
+        if (!formOpen) {
+          if (!paletteOpen) opener.current = document.activeElement as HTMLElement | null
+          setPaletteOpen((open) => !open)
+        }
       } else if (event.key === "/" && !typing && !formOpen) {
         event.preventDefault()
+        opener.current = document.activeElement as HTMLElement | null
         setPaletteOpen(true)
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [formOpen])
+  }, [formOpen, paletteOpen])
+
+  useEffect(() => {
+    if (paletteOpen || !returnFocus.current) return
+    const target = returnFocus.current === "chart" ? heading.current : opener.current
+    returnFocus.current = null
+    target?.focus()
+  }, [paletteOpen, patient?.id])
 
   function select(id: string, focusChart = true) {
     setPatientId(id)
@@ -214,7 +229,13 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
             <p className="c-brand-name">Meridian Clinical</p>
             <p className="c-brand-sub">Outpatient panel, 20 Oct 2026</p>
           </div>
-          <button type="button" className="c-jump" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K /">
+          <button
+            type="button"
+            className="c-jump"
+            onClick={(event) => {
+              opener.current = event.currentTarget
+              setPaletteOpen(true)
+            }} aria-keyshortcuts="Meta+K Control+K /">
             <MagnifyingGlass size={16} aria-hidden="true" />
             <span>Go to a patient or action</span>
             <kbd>{/Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K"}</kbd>
@@ -318,7 +339,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
               </button>
             ) : null}
           </aside>
-          <main className="c-main">
+          <main className="c-main" ref={main}>
             {missing ? (
               <div className="c-missing">
                 <h1 id="patient-chart" tabIndex={-1} ref={heading}>
@@ -525,8 +546,14 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
         <CommandPalette
           patients={orderPatients(patients, "all", "")}
           actions={paletteActions}
-          onPick={(id) => select(id)}
-          onClose={() => setPaletteOpen(false)}
+          onPick={(id) => {
+            returnFocus.current = "chart"
+            select(id, false)
+          }}
+          onClose={() => {
+            returnFocus.current ??= "opener"
+            setPaletteOpen(false)
+          }}
         />
       ) : null}
     </div>

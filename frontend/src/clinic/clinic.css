@@ -506,7 +506,7 @@
 }
 
 .c-chart-block { min-width: 0; }
-.c-plot { outline: none; }
+.c-plot { outline: none; touch-action: pan-y; }
 .c-plot:focus-visible { outline: 1px dashed var(--focus); outline-offset: 4px; }
 .c-chart-svg { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: crosshair; }
 .c-grid-major { fill: none; stroke: var(--ecg-major); stroke-width: 1; }

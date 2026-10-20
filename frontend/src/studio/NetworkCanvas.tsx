@@ -475,13 +475,20 @@ export function NetworkCanvas({
       canvas.style.cursor = node ? "pointer" : "default"
       if (event.type === "pointerdown" && node) onSelectRef.current({ layer: node.layer, unit: node.unit })
     }
+    const onLeave = () => {
+      hover.layer = -1
+      hover.unit = -1
+      canvas.style.cursor = "default"
+    }
     canvas.addEventListener("pointermove", onPointer)
     canvas.addEventListener("pointerdown", onPointer)
+    canvas.addEventListener("pointerleave", onLeave)
     frame = requestAnimationFrame(draw)
     return () => {
       cancelAnimationFrame(frame)
       canvas.removeEventListener("pointermove", onPointer)
       canvas.removeEventListener("pointerdown", onPointer)
+      canvas.removeEventListener("pointerleave", onLeave)
     }
   }, [])
 
