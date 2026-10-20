@@ -1187,3 +1187,127 @@
 @media (prefers-color-scheme: dark) {
   .c-toast { background: #232a1c; }
 }
+
+/* Liquid Glass: the floating controls layer */
+
+.clinic {
+  --bar: 76px;
+  --glass-dark: rgba(30, 37, 24, 0.66);
+  --glass-light: rgba(240, 242, 233, 0.7);
+  --glass-rim: rgba(255, 255, 255, 0.16);
+  --glass-rim-light: rgba(255, 255, 255, 0.75);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 48%);
+  --glass-shadow: 0 18px 40px -18px rgba(12, 16, 9, 0.55), 0 2px 6px -2px rgba(12, 16, 9, 0.25);
+}
+
+.c-shell { position: relative; }
+
+.c-topbar {
+  position: absolute;
+  z-index: 20;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border: 1px solid var(--glass-rim);
+  border-radius: 16px;
+  background: var(--glass-sheen), var(--glass-dark);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.c-topbar::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--flare), transparent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.c-topbar .c-btn,
+.c-jump { border-radius: 10px; }
+.c-jump { background: rgba(255, 255, 255, 0.06); }
+.c-topbar .c-btn-primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 12px -6px rgba(217, 153, 58, 0.7); }
+
+.c-census,
+.c-main {
+  padding-top: calc(var(--bar) + 0.75rem);
+  scroll-padding-top: calc(var(--bar) + 0.75rem);
+}
+
+.c-palette {
+  border-radius: 18px;
+  background: var(--glass-sheen), var(--glass-light);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 30px 70px -24px rgba(12, 16, 9, 0.6), 0 0 0 1px var(--glass-rim-light) inset;
+  transform-origin: top center;
+  animation: c-materialize 260ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.c-palette-row { border-radius: 10px; }
+.c-palette-field input { font-weight: 500; }
+.c-palette-scrim { background: rgba(20, 24, 16, 0.32); }
+
+.c-toast {
+  border-left: 0;
+  border-radius: 999px;
+  padding: 0.625rem 1.125rem 0.625rem 0.875rem;
+  background: var(--glass-sheen), var(--glass-dark);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-rim);
+}
+
+@keyframes c-materialize {
+  from { opacity: 0; transform: translateY(-6px) scale(0.965); filter: blur(6px); }
+}
+
+@media (max-width: 860px) {
+  .c-topbar {
+    position: sticky;
+    top: 8px;
+    left: auto;
+    right: auto;
+    margin: 8px 8px 0;
+  }
+
+  .c-census,
+  .c-main { padding-top: 1rem; scroll-padding-top: 0; }
+  .clinic { scroll-padding-top: 140px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .clinic {
+    --glass-dark: rgba(14, 17, 11, 0.62);
+    --glass-light: rgba(26, 31, 21, 0.72);
+    --glass-rim: rgba(255, 255, 255, 0.1);
+    --glass-rim-light: rgba(255, 255, 255, 0.12);
+    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
+  }
+
+  .c-toast { background: var(--glass-sheen), var(--glass-dark); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .c-topbar,
+  .c-toast { background: var(--command); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .c-palette { background: var(--sheet); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+@media (prefers-contrast: more) {
+  .c-topbar,
+  .c-toast { background: var(--command); -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--command-ink); }
+  .c-palette { background: var(--sheet); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 0 0 2px var(--ink); }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .c-topbar,
+  .c-toast { background: var(--command); }
+  .c-palette { background: var(--sheet); }
+}
