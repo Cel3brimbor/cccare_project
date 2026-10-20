@@ -131,7 +131,10 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     const node = bar.current
     const root = shell.current?.closest<HTMLElement>(".clinic")
     if (!node || !root) return
-    const fit = () => root.style.setProperty("--bar", `${Math.ceil(node.offsetHeight + node.offsetTop)}px`)
+    const fit = () => {
+      const top = Number.parseFloat(getComputedStyle(node).top) || 0
+      root.style.setProperty("--bar", `${Math.ceil(node.offsetHeight + top)}px`)
+    }
     fit()
     const observer = new ResizeObserver(fit)
     observer.observe(node)
