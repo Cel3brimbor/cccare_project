@@ -66,7 +66,7 @@ export function TrendChart({
   const inset = chart.plot.right < 60
   const labelX = inset ? plotRight - 6 : plotRight + 12
   const labelAnchor = inset ? "end" : "start"
-  const labelLift = inset ? -8 : 4
+  const labelLift = inset ? -12 : 4
 
   function key(event: KeyboardEvent<HTMLDivElement>) {
     const last = points.length - 1

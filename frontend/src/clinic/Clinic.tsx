@@ -13,6 +13,10 @@ import "./clinic.css"
 
 type Filter = "all" | "worsening"
 
+const SHORT_CONDITIONS: Record<string, string> = {
+  "heart-failure": "HFrEF",
+}
+
 const MEASURE_TAGS: Record<string, string> = {
   hba1c: "HbA1c",
   symptom: "Symptoms",
@@ -290,7 +294,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                                 : formatMeasure(itemLatest.value, itemCondition.measure)}
                             </span>
                             <span className="c-patient-meta" title={itemCondition.name}>
-                              {itemCondition.name}
+                              {SHORT_CONDITIONS[itemCondition.id] ?? itemCondition.name}
                             </span>
                             <Sparkline readings={item.readings} />
                           </button>
