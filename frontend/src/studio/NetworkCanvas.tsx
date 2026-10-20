@@ -110,6 +110,7 @@ export function NetworkCanvas({
     let sizeKey = ""
     let nodes: Node[] = []
     let buckets: { path: Path2D; color: string; alpha: number }[] = []
+    let edges: { source: Node; dest: Node; value: number; strength: number }[] = []
     const particles: Particle[] = []
     let last = performance.now()
     const hover = { layer: -1, unit: -1 }
@@ -170,6 +171,7 @@ export function NetworkCanvas({
         anchors.push(column)
       })
       buckets = []
+      edges = []
       const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
       if (!trace) return
       const positive = cssColor("--pos", "#b86a2e")
@@ -190,6 +192,7 @@ export function NetworkCanvas({
         const add = (source: Node, dest: Node, value: number, faint = false) => {
           const alpha = faint ? 0.035 : Math.max(0.3, Math.pow(Math.min(1, Math.abs(value) / scale), 0.8) * 0.85)
           const color = value >= 0 ? positive : negative
+          edges.push({ source, dest, value, strength: Math.min(1, Math.abs(value) / scale) })
           const bucket = faint ? alpha : Math.round(alpha * 5) / 5
           const key = `${color}:${bucket}`
           let group = groups.get(key)
@@ -304,12 +307,30 @@ export function NetworkCanvas({
           context.fill()
         }
       }
+      const focus = hover.layer >= 0 ? hover : null
       buckets.forEach((bucket) => {
-        context.globalAlpha = bucket.alpha
+        context.globalAlpha = focus ? bucket.alpha * 0.16 : bucket.alpha
         context.strokeStyle = bucket.color
         context.lineWidth = 1
         context.stroke(bucket.path)
       })
+      if (focus) {
+        const positiveInk = cssColor("--pos", "#4f6420")
+        const negativeInk = cssColor("--neg", "#3d5a6c")
+        context.lineWidth = 1.5
+        edges.forEach((edge) => {
+          const touches =
+            (edge.source.layer === focus.layer && edge.source.unit === focus.unit) ||
+            (edge.dest.layer === focus.layer && edge.dest.unit === focus.unit)
+          if (!touches) return
+          context.globalAlpha = Math.max(0.3, Math.pow(edge.strength, 0.7))
+          context.strokeStyle = edge.value >= 0 ? positiveInk : negativeInk
+          context.beginPath()
+          context.moveTo(edge.source.x, edge.source.y)
+          context.lineTo(edge.dest.x, edge.dest.y)
+          context.stroke()
+        })
+      }
       context.globalAlpha = 1
       const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
       const accent = parseColor(cssColor("--accent", "#0a84ff"))

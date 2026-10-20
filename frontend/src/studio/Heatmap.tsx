@@ -66,11 +66,12 @@ export function Heatmap({
     const maxWidth = canvas.parentElement?.clientWidth ?? 360
     const cell = Math.max(2, Math.min(13, Math.floor(maxWidth / cols), Math.floor(220 / rows)))
     layoutRef.current = { cell, cols }
+    const tall = rows === 1 ? Math.max(cell, 12) : cell
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     canvas.width = Math.floor(cols * cell * dpr)
-    canvas.height = Math.floor(rows * cell * dpr)
+    canvas.height = Math.floor(rows * tall * dpr)
     canvas.style.width = `${cols * cell}px`
-    canvas.style.height = `${rows * cell}px`
+    canvas.style.height = `${rows * tall}px`
     const context = canvas.getContext("2d")
     if (!context) return
     context.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -92,17 +93,17 @@ export function Heatmap({
             ? mix(paper, value >= 0 ? positive : negative, Math.min(1, Math.abs(value) / peak))
             : mix(idle, accent, Math.min(1, Math.abs(value) / peak))
         context.fillStyle = css(color)
-        context.fillRect(col * cell, row * cell, cell - gap, cell - gap)
+        context.fillRect(col * cell, row * tall, cell - gap, tall - gap)
       }
     }
     context.strokeStyle = css(accent)
     context.lineWidth = 1.5
     if (selected !== null && selected >= 0 && selected < cols) {
-      context.strokeRect(selected * cell + 0.5, 0.5, cell - 1, rows * cell - 1)
+      context.strokeRect(selected * cell + 0.5, 0.5, cell - 1, rows * tall - 1)
     }
     if (cursor !== null && cursor >= 0 && cursor < rows) {
       context.globalAlpha = 0.9
-      context.strokeRect(0.5, cursor * cell + 0.5, cols * cell - 1, cell - 1)
+      context.strokeRect(0.5, cursor * tall + 0.5, cols * cell - 1, tall - 1)
       context.globalAlpha = 1
     }
   }, [matrix, selected, cursor, mode])
