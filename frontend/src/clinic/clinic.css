@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
-
 .clinic {
   --paper: #dfe1d6;
   --census: #d3d6c9;
@@ -20,7 +18,7 @@
   --focus: #91550d;
   --command: #252c1e;
   --command-ink: #e3e6d9;
-  --command-dim: #a3aa94;
+  --command-dim: #b8bfaa;
   --flare: #d9993a;
   --scrim: rgba(20, 24, 16, 0.6);
   --lift: none;
@@ -1192,8 +1190,8 @@
 
 .clinic {
   --bar: 76px;
-  --glass-dark: rgba(30, 37, 24, 0.66);
-  --glass-light: rgba(240, 242, 233, 0.7);
+  --glass-dark: rgba(30, 37, 24, 0.86);
+  --glass-light: rgba(240, 242, 233, 0.86);
   --glass-rim: rgba(255, 255, 255, 0.16);
   --glass-rim-light: rgba(255, 255, 255, 0.75);
   --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 48%);
@@ -1284,8 +1282,8 @@
 
 @media (prefers-color-scheme: dark) {
   .clinic {
-    --glass-dark: rgba(14, 17, 11, 0.62);
-    --glass-light: rgba(26, 31, 21, 0.72);
+    --glass-dark: rgba(14, 17, 11, 0.84);
+    --glass-light: rgba(26, 31, 21, 0.86);
     --glass-rim: rgba(255, 255, 255, 0.1);
     --glass-rim-light: rgba(255, 255, 255, 0.12);
     --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);

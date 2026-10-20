@@ -1,11 +1,7 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App } from "./App"
-import { connect } from "./studio/store"
-import "katex/dist/katex.min.css"
 import "./styles.css"
-
-connect()
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

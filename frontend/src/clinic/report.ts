@@ -39,31 +39,31 @@ export function buildReport(patient: Patient, treatmentId: string): string {
   <style>
     :root { color-scheme: light; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #f0f9ff; color: #0c4a6e; font: 16px/1.5 "Segoe UI", "Helvetica Neue", sans-serif; }
+    body { margin: 0; background: #eef0e7; color: #1b2016; font: 16px/1.5 Archivo, "Helvetica Neue", Arial, sans-serif; }
     main { max-width: 800px; margin: 0 auto; padding: 32px 20px 64px; }
-    h1, h2, h3 { font-family: "Segoe UI", "Helvetica Neue", sans-serif; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 8px; }
+    h1, h2, h3 { font-family: Archivo, "Helvetica Neue", Arial, sans-serif; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 8px; }
     h1 { font-size: 1.8rem; }
     h2 { font-size: 1.25rem; margin-top: 32px; }
     h3 { font-size: 1.05rem; margin-top: 20px; }
     p { margin: 0 0 12px; }
-    .meta { color: #334155; }
-    .note { background: #fff; border: 2px solid #5f87a3; border-radius: 12px; padding: 12px 16px; }
-    .result { background: #fff; border: 2px solid #0c4a6e; border-radius: 12px; padding: 16px; }
+    .meta { color: #535a4a; }
+    .note { background: #fff; border: 2px solid #c2c6b6; border-radius: 2px; padding: 12px 16px; }
+    .result { background: #fff; border: 2px solid #1b2016; border-radius: 2px; padding: 16px; }
     .result strong { font-size: 1.4rem; }
     table { width: 100%; border-collapse: collapse; background: #fff; margin: 8px 0 16px; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #5f87a3; vertical-align: top; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #c2c6b6; vertical-align: top; }
     th { font-size: 0.875rem; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
-    figure { margin: 12px 0; background: #fff; border: 2px solid #5f87a3; border-radius: 12px; padding: 12px; }
+    figure { margin: 12px 0; background: #fff; border: 2px solid #c2c6b6; border-radius: 2px; padding: 12px; }
     svg { width: 100%; height: auto; display: block; }
     .legend { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 0; padding: 0; list-style: none; }
-    .legend i { display: inline-block; width: 28px; height: 0; border-top: 3px solid #0c4a6e; margin-right: 6px; vertical-align: middle; }
-    .legend .dashed { border-top-style: dashed; border-top-color: #0369a1; }
-    .legend .dotted { border-top-style: dotted; border-top-color: #166534; }
-    .eq { font-variant-numeric: tabular-nums; background: #e8f2f8; padding: 8px 12px; border-radius: 8px; }
-    details { background: #fff; border: 2px solid #5f87a3; border-radius: 12px; padding: 8px 16px; margin: 12px 0; }
+    .legend i { display: inline-block; width: 28px; height: 0; border-top: 3px solid #1b2016; margin-right: 6px; vertical-align: middle; }
+    .legend .dashed { border-top-style: dashed; border-top-color: #91550d; }
+    .legend .dotted { border-top-style: dotted; border-top-color: #3f5d1b; }
+    .eq { font-variant-numeric: tabular-nums; background: #dfe1d6; padding: 8px 12px; border-radius: 8px; }
+    details { background: #fff; border: 2px solid #c2c6b6; border-radius: 2px; padding: 8px 16px; margin: 12px 0; }
     summary { cursor: pointer; font-weight: 650; min-height: 44px; display: flex; align-items: center; }
-    a { color: #0c4a6e; }
+    a { color: #1b2016; }
     @media print {
       body { background: #fff; }
       main { max-width: none; padding: 0; }
@@ -191,18 +191,18 @@ function chartSvg(
 ): string {
   const axis = `M ${chart.plot.left} ${chart.plot.top} V ${chart.height - chart.plot.bottom} H ${chart.width - chart.plot.right}`
   const goal = chart.goal
-    ? `<line x1="${chart.plot.left}" y1="${chart.goal.y.toFixed(1)}" x2="${chart.width - chart.plot.right}" y2="${chart.goal.y.toFixed(1)}" stroke="#166534" stroke-width="2" stroke-dasharray="2 4" />
-       <text x="${chart.plot.left + 6}" y="${(chart.goal.y - 6).toFixed(1)}" fill="#166534" font-size="13">Goal ${esc(goalLabel)}</text>`
+    ? `<line x1="${chart.plot.left}" y1="${chart.goal.y.toFixed(1)}" x2="${chart.width - chart.plot.right}" y2="${chart.goal.y.toFixed(1)}" stroke="#3f5d1b" stroke-width="2" stroke-dasharray="2 4" />
+       <text x="${chart.plot.left + 6}" y="${(chart.goal.y - 6).toFixed(1)}" fill="#3f5d1b" font-size="13">Goal ${esc(goalLabel)}</text>`
     : ""
   return `<svg viewBox="0 0 ${chart.width} ${chart.height}" role="img" aria-label="Recorded results as a solid line, projection as a dashed line, and the goal as a dotted line. Higher is worse.">
-    <path d="${axis}" fill="none" stroke="#5f87a3" stroke-width="1.5" />
-    ${chart.yTicks.map((tick) => `<text x="4" y="${(tick.y + 4).toFixed(1)}" fill="#0c4a6e" font-size="13">${esc(tick.label)}</text>`).join("")}
-    ${chart.xTicks.map((tick) => `<text x="${tick.x.toFixed(1)}" y="${chart.height - 8}" text-anchor="middle" fill="#0c4a6e" font-size="13">${esc(tick.label)}</text>`).join("")}
+    <path d="${axis}" fill="none" stroke="#c2c6b6" stroke-width="1.5" />
+    ${chart.yTicks.map((tick) => `<text x="4" y="${(tick.y + 4).toFixed(1)}" fill="#1b2016" font-size="13">${esc(tick.label)}</text>`).join("")}
+    ${chart.xTicks.map((tick) => `<text x="${tick.x.toFixed(1)}" y="${chart.height - 8}" text-anchor="middle" fill="#1b2016" font-size="13">${esc(tick.label)}</text>`).join("")}
     ${goal}
-    <polyline points="${pointsAttr(chart.recorded)}" fill="none" stroke="#0c4a6e" stroke-width="2.5" />
-    <polyline points="${pointsAttr(chart.projected)}" fill="none" stroke="#0369a1" stroke-width="2.5" stroke-dasharray="6 4" />
-    ${recordedEnd ? `<circle cx="${recordedEnd.x.toFixed(1)}" cy="${recordedEnd.y.toFixed(1)}" r="4" fill="#0c4a6e" />` : ""}
-    ${projectedEnd ? `<circle cx="${projectedEnd.x.toFixed(1)}" cy="${projectedEnd.y.toFixed(1)}" r="4" fill="#0369a1" />` : ""}
+    <polyline points="${pointsAttr(chart.recorded)}" fill="none" stroke="#1b2016" stroke-width="2.5" />
+    <polyline points="${pointsAttr(chart.projected)}" fill="none" stroke="#91550d" stroke-width="2.5" stroke-dasharray="6 4" />
+    ${recordedEnd ? `<circle cx="${recordedEnd.x.toFixed(1)}" cy="${recordedEnd.y.toFixed(1)}" r="4" fill="#1b2016" />` : ""}
+    ${projectedEnd ? `<circle cx="${projectedEnd.x.toFixed(1)}" cy="${projectedEnd.y.toFixed(1)}" r="4" fill="#91550d" />` : ""}
   </svg>`
 }
 
@@ -211,7 +211,7 @@ function diagramSvg(selected: string): string {
   const edges = diagram.edges
     .map((edge) => {
       const hot = edge.from === selected || edge.to === selected
-      const color = edge.weight < 0 ? "#1e3a8a" : "#9a3412"
+      const color = edge.weight < 0 ? "#3d5a6c" : "#4f6420"
       return `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="${color}" stroke-width="${edgeWidth(edge.weight).toFixed(2)}" opacity="${hot ? 0.95 : 0.28}" />`
     })
     .join("")
@@ -219,9 +219,9 @@ function diagramSvg(selected: string): string {
     .map((node) => {
       const on = node.id === selected
       const chip = node.anchor === "middle" ? `<rect x="${node.textX - 62}" y="${node.textY - 12}" width="124" height="16" fill="#ffffff" />` : ""
-      return `<circle cx="${node.x}" cy="${node.y}" r="16" fill="#fff" stroke="${on ? "#0c4a6e" : "#5f87a3"}" stroke-width="${on ? 3 : 1.5}" />
+      return `<circle cx="${node.x}" cy="${node.y}" r="16" fill="#fff" stroke="${on ? "#1b2016" : "#c2c6b6"}" stroke-width="${on ? 3 : 1.5}" />
         ${chip}
-        <text x="${node.textX}" y="${node.textY}" text-anchor="${node.anchor}" fill="#0c4a6e" font-size="13">${esc(node.label)}</text>`
+        <text x="${node.textX}" y="${node.textY}" text-anchor="${node.anchor}" fill="#1b2016" font-size="13">${esc(node.label)}</text>`
     })
     .join("")
   return `<svg viewBox="0 0 ${diagram.width} ${diagram.height}" role="img" aria-label="Network with six inputs, four hidden units, and two outputs. Ochre is a positive weight and blue is a negative weight. Thicker lines are larger weights.">

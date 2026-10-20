@@ -745,6 +745,18 @@ fieldset:disabled { opacity: 0.55; }
 .class-bars small { color: var(--secondary); font-size: 0.7rem; }
 .digit-row { display: flex; align-items: center; gap: 12px; }
 
+.loading {
+  margin: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--secondary);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .sr {
   position: absolute;
   width: 1px;
@@ -818,8 +830,8 @@ fieldset:disabled { opacity: 0.55; }
 /* Liquid Glass: the floating controls layer */
 
 :root {
-  --glass: rgba(240, 242, 233, 0.66);
-  --glass-heavy: rgba(240, 242, 233, 0.8);
+  --glass: rgba(240, 242, 233, 0.86);
+  --glass-heavy: rgba(240, 242, 233, 0.9);
   --glass-rim: rgba(255, 255, 255, 0.75);
   --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 42%);
   --glass-shadow: 0 20px 44px -20px rgba(12, 16, 9, 0.5), 0 2px 6px -2px rgba(12, 16, 9, 0.18);
@@ -827,8 +839,8 @@ fieldset:disabled { opacity: 0.55; }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --glass: rgba(24, 28, 20, 0.62);
-    --glass-heavy: rgba(24, 28, 20, 0.8);
+    --glass: rgba(24, 28, 20, 0.84);
+    --glass-heavy: rgba(24, 28, 20, 0.9);
     --glass-rim: rgba(255, 255, 255, 0.1);
     --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 42%);
   }

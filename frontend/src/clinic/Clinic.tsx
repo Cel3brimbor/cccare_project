@@ -153,9 +153,13 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     const created = makePatient(input, patients)
     const next = [...added, created]
     setAdded(next)
-    saveAdded(next)
+    const saved = saveAdded(next)
     setFormOpen(false)
-    announce(`Added ${fullName(created)} to the panel.`)
+    announce(
+      saved
+        ? `Added ${fullName(created)} to the panel.`
+        : `Added ${fullName(created)} for this visit only. This browser is not allowing saved records.`,
+    )
     select(created.id)
   }
 
