@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { DownloadSimple, MagnifyingGlass, Pulse, UserPlus } from "@phosphor-icons/react"
+import { DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
 import { NetworkPanel } from "./NetworkPanel"
 import { PatientForm } from "./PatientForm"
 import { TrendChart } from "./TrendChart"
@@ -111,6 +111,15 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     setStatus(`Downloaded a projection file for ${fullName(patient)}.`)
   }
 
+  const groups = (["Worsening", "Stable", "Improving"] as Course[])
+    .map((name) => ({
+      name,
+      items: visible.filter(
+        (item) => courseOf(recentDelta(item.readings), conditionById(item.conditionId).measure) === name,
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
+
   return (
     <div className="clinic">
       <a className="c-skip" href="#patient-chart">
@@ -121,81 +130,93 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
       </div>
       <div className="c-shell" inert={formOpen}>
         <header className="c-topbar">
-          <div className="c-topbar-inner">
-            <div className="c-brand">
-              <Pulse size={20} aria-hidden="true" />
-              <div>
-                <p className="c-brand-name">Meridian Clinical</p>
-                <p className="c-brand-sub">Outpatient panel · 20 Oct 2026</p>
-              </div>
-            </div>
-            <div className="c-actions">
-              <button ref={newButton} type="button" className="c-btn c-btn-primary" onClick={() => setFormOpen(true)}>
-                <UserPlus size={20} aria-hidden="true" />
-                New patient
-              </button>
-              <button type="button" className="c-btn" onClick={onOpenBench}>
-                Training bench
-              </button>
-            </div>
+          <div className="c-brand">
+            <Pulse size={22} weight="bold" aria-hidden="true" />
+            <p className="c-brand-name">Meridian Clinical</p>
+            <p className="c-brand-sub">Outpatient panel, 20 Oct 2026</p>
+          </div>
+          <div className="c-actions">
+            <button type="button" className="c-btn c-btn-quiet" onClick={onOpenBench}>
+              Training bench
+            </button>
+            <button ref={newButton} type="button" className="c-btn c-btn-primary" onClick={() => setFormOpen(true)}>
+              <UserPlus size={20} aria-hidden="true" />
+              New patient
+            </button>
           </div>
         </header>
         <div className="c-frame">
           <aside className="c-census" aria-label="Patients">
-            <h2>Patients</h2>
-            <label className="c-field" htmlFor="patient-search">
-              <span>Search</span>
-              <span className="c-search">
-                <MagnifyingGlass size={20} aria-hidden="true" />
+            <div className="c-census-tools">
+              <label className="c-search" htmlFor="patient-search">
+                <MagnifyingGlass size={18} aria-hidden="true" />
+                <span className="sr">Search patients</span>
                 <input
                   id="patient-search"
                   type="search"
+                  placeholder="Name, MRN or condition"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />
-              </span>
-            </label>
-            <div className="c-filters" role="group" aria-label="Filter records">
-              <FilterButton current={filter} id="all" onSelect={setFilter}>
-                All
-              </FilterButton>
-              <FilterButton current={filter} id="worsening" onSelect={setFilter}>
-                Worsening
-              </FilterButton>
+              </label>
+              <div className="c-filters" role="group" aria-label="Filter records">
+                <FilterButton current={filter} id="all" onSelect={setFilter}>
+                  {`All ${patients.length}`}
+                </FilterButton>
+                <FilterButton current={filter} id="worsening" onSelect={setFilter}>
+                  Worsening only
+                </FilterButton>
+              </div>
             </div>
             {visible.length === 0 ? (
-              <p className="c-empty">No records match that search.</p>
+              <div className="c-empty">
+                <p>No patient matches that search.</p>
+                <button
+                  type="button"
+                  className="c-btn"
+                  onClick={() => {
+                    setQuery("")
+                    setFilter("all")
+                  }}
+                >
+                  Clear search
+                </button>
+              </div>
             ) : (
-              <ul className="c-patient-list">
-                {visible.map((item) => {
-                  const itemCondition = conditionById(item.conditionId)
-                  const itemCourse = courseOf(recentDelta(item.readings), itemCondition.measure)
-                  const itemLatest = item.readings[item.readings.length - 1]
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        className="c-patient"
-                        aria-current={item.id === patient?.id ? "true" : undefined}
-                        onClick={() => select(item.id)}
-                      >
-                        <span className="c-patient-name">{fullName(item)}</span>
-                        <span className="c-patient-meta">
-                          {item.mrn} · {itemCondition.name}
-                        </span>
-                        <span className="c-patient-meta">
-                          {formatMeasure(itemLatest.value, itemCondition.measure)} · <CourseText course={itemCourse} />
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              groups.map((group) => (
+                <section key={group.name} className="c-group" aria-labelledby={`group-${group.name}`}>
+                  <h2 id={`group-${group.name}`} className={`c-group-title is-${group.name.toLowerCase()}`}>
+                    {group.name}
+                    <span className="c-count">{group.items.length}</span>
+                  </h2>
+                  <ul className="c-patient-list">
+                    {group.items.map((item) => {
+                      const itemCondition = conditionById(item.conditionId)
+                      const itemLatest = item.readings[item.readings.length - 1]
+                      return (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            className={`c-patient is-${group.name.toLowerCase()}`}
+                            aria-current={item.id === patient?.id ? "true" : undefined}
+                            onClick={() => select(item.id)}
+                          >
+                            <span className="c-patient-name">{fullName(item)}</span>
+                            <span className="c-patient-value">{formatMeasure(itemLatest.value, itemCondition.measure)}</span>
+                            <span className="c-patient-meta">{itemCondition.name}</span>
+                            <Sparkline readings={item.readings} />
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))
             )}
-            {query || filter !== "all" ? (
+            {visible.length > 0 && (query || filter !== "all") ? (
               <button
                 type="button"
-                className="c-btn"
+                className="c-btn c-btn-quiet"
                 onClick={() => {
                   setQuery("")
                   setFilter("all")
@@ -207,22 +228,34 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
           </aside>
           <main className="c-main">
             {missing ? (
-              <h1 id="patient-chart" tabIndex={-1} ref={heading}>
-                That record is not on this panel.
-              </h1>
+              <div className="c-missing">
+                <h1 id="patient-chart" tabIndex={-1} ref={heading}>
+                  That record is not on this panel.
+                </h1>
+                <p>It may have been removed from this browser. Choose a patient from the list.</p>
+              </div>
             ) : null}
             {patient && condition && latest && selected ? (
-              <div className="c-grid">
-                <div className="c-span-12 c-identity">
-                  <div>
-                    <p className="c-kicker">{course === "Worsening" ? "Needs review" : "On the panel"}</p>
+              <div className="c-chart-page">
+                <header className="c-identity">
+                  <div className="c-identity-copy">
                     <h1 id="patient-chart" tabIndex={-1} ref={heading}>
-                      {fullName(patient)}
+                      <span className="c-family">{patient.family},</span> {patient.given}
                     </h1>
-                    <p className="c-meta">
-                      {patient.mrn} · {patient.age} years · {patient.sex}
+                    <p className="c-condition">{condition.name}</p>
+                    <p className="c-ids">
+                      <span>{patient.mrn}</span>
+                      <span>{patient.age} years</span>
+                      <span>{patient.sex}</span>
                     </p>
-                    <p>{condition.name}</p>
+                    {patient.allergies.toLowerCase().includes("no known") ? (
+                      <p className="c-allergy is-none">{patient.allergies}</p>
+                    ) : (
+                      <p className="c-allergy">
+                        <WarningOctagon size={18} weight="fill" aria-hidden="true" />
+                        Allergy: {patient.allergies}
+                      </p>
+                    )}
                   </div>
                   <div className="c-actions">
                     <button type="button" className="c-btn" onClick={download}>
@@ -241,69 +274,51 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                           </button>
                         </div>
                       ) : (
-                        <button type="button" className="c-btn" onClick={() => setArmed(true)}>
+                        <button type="button" className="c-btn c-btn-quiet" onClick={() => setArmed(true)}>
                           Remove record
                         </button>
                       )
                     ) : null}
                   </div>
-                </div>
-                <p className="c-banner c-span-12" role="note">
-                  Synthetic record. The projection is a fixed six-input network for a conversation, not a device cleared
-                  for diagnosis or treatment, and it was not trained on these charts.
-                </p>
-                <dl className="c-facts c-span-12">
+                </header>
+                <dl className="c-readout">
                   <div>
-                    <dt>Problems</dt>
-                    <dd>{[condition.name, ...patient.problems].join(", ")}</dd>
-                  </div>
-                  <div>
-                    <dt>Medicines</dt>
-                    <dd>{patient.medications.join("; ")}</dd>
-                  </div>
-                  <div>
-                    <dt>Allergies</dt>
-                    <dd className={patient.allergies.toLowerCase().includes("no known") ? undefined : "c-bad"}>
-                      {patient.allergies}
+                    <dt>Latest {condition.measure.name}</dt>
+                    <dd className="c-figure">{formatMeasure(latest.value, condition.measure)}</dd>
+                    <dd className="c-meta">
+                      {formatDate(latest.date)}. {scaleNote(condition.measure)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Note</dt>
-                    <dd>{patient.note || "No note on the record."}</dd>
+                    <dt>Recent course</dt>
+                    <dd className="c-figure">
+                      <CourseText course={course} />
+                    </dd>
+                    <dd className="c-meta">{changeText(delta, condition.measure)} over the last 8 readings.</dd>
+                  </div>
+                  <div>
+                    <dt>Adherence</dt>
+                    <dd className="c-figure">{Math.round(patient.adherence * 100)}%</dd>
+                    <dd className="c-meta">Share of the current plan being followed.</dd>
+                  </div>
+                  <div>
+                    <dt>In 12 weeks</dt>
+                    <dd className="c-figure is-projected">
+                      {formatMeasure(selected.explanation.futureNative, condition.measure)}
+                    </dd>
+                    <dd className="c-meta">
+                      {selected.treatment.name}. {Math.round(selected.explanation.probability * 100)}% chance of a drop
+                      of at least {formatGoal(condition.measure)}.
+                    </dd>
                   </div>
                 </dl>
-                <article className="c-stat c-span-3">
-                  <h2>Latest {condition.measure.name}</h2>
-                  <p className="c-figure">{formatMeasure(latest.value, condition.measure)}</p>
-                  <p className="c-meta">
-                    {formatDate(latest.date)}. {scaleNote(condition.measure)}
-                  </p>
-                </article>
-                <article className="c-stat c-span-3">
-                  <h2>Recent course</h2>
-                  <p className="c-figure">
-                    <CourseText course={course} />
-                  </p>
-                  <p className="c-meta">{changeText(delta, condition.measure)} over the last 8 readings.</p>
-                </article>
-                <article className="c-stat c-span-3">
-                  <h2>Adherence</h2>
-                  <p className="c-figure">{Math.round(patient.adherence * 100)}%</p>
-                  <p className="c-meta">Share of the current plan being followed.</p>
-                </article>
-                <article className="c-stat c-span-3">
-                  <h2>12-week projection</h2>
-                  <p className="c-figure">{formatMeasure(selected.explanation.futureNative, condition.measure)}</p>
-                  <p className="c-meta">
-                    {Math.round(selected.explanation.probability * 100)}% chance of a drop of at least{" "}
-                    {formatGoal(condition.measure)}.
-                  </p>
-                </article>
-                <section className="c-card c-span-7" aria-labelledby="course-heading">
-                  <h2 id="course-heading">Course and projection</h2>
-                  <p className="c-lead" aria-live="polite">
-                    {lead(patient.given, condition.measure.name, selected, ranked, condition.measure)}
-                  </p>
+                <section className="c-sheet c-course" aria-labelledby="course-heading">
+                  <div className="c-sheet-head">
+                    <h2 id="course-heading">Course and projection</h2>
+                    <p className="c-lead" aria-live="polite">
+                      {lead(patient.given, condition.measure.name, selected, ranked, condition.measure)}
+                    </p>
+                  </div>
                   <TrendChart
                     key={`${patient.id}-${selected.treatment.id}`}
                     recorded={patient.readings}
@@ -311,46 +326,83 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                     measure={condition.measure}
                     treatmentName={selected.treatment.name}
                   />
+                  <p className="c-banner" role="note">
+                    Synthetic record. The projection is a fixed six-input network for a conversation, not a device
+                    cleared for diagnosis or treatment, and it was not trained on these charts.
+                  </p>
                 </section>
-                <section className="c-card c-span-5" aria-labelledby="options-heading">
-                  <h2 id="options-heading">Treatment options</h2>
-                  <p>Sorted by the estimated chance of a meaningful improvement. The chart follows the selected option.</p>
-                  <fieldset className="c-options">
-                    <legend className="sr">Treatment options</legend>
-                    {ranked.map((item) => {
-                      const on = item.treatment.id === selected.treatment.id
-                      return (
-                        <label key={item.treatment.id} className={on ? "c-option is-on" : "c-option"}>
-                          <input
-                            type="radio"
-                            name="treatment"
-                            value={item.treatment.id}
-                            checked={on}
-                            onChange={() => setTreatmentId(item.treatment.id)}
-                          />
-                          <span className="c-option-copy">
-                            <span className="c-option-name">{item.treatment.name}</span>
-                            <span>{item.treatment.summary}</span>
-                            <span className="c-option-stats">
-                              <span>{formatMeasure(item.explanation.futureNative, condition.measure)} in 12 weeks</span>
-                              <span>
-                                {Math.round(item.explanation.probability * 100)}% chance of a drop of at least{" "}
-                                {formatGoal(condition.measure)}
+                <div className="c-pair">
+                  <section className="c-sheet c-options-sheet" aria-labelledby="options-heading">
+                    <h2 id="options-heading">Treatment options</h2>
+                    <p className="c-meta">
+                      Sorted by the chance of a drop of at least {formatGoal(condition.measure)}. The chart follows the
+                      option you choose.
+                    </p>
+                    <fieldset className="c-options">
+                      <legend className="sr">Treatment options</legend>
+                      {ranked.map((item) => {
+                        const on = item.treatment.id === selected.treatment.id
+                        const chance = Math.round(item.explanation.probability * 100)
+                        return (
+                          <label key={item.treatment.id} className={on ? "c-option is-on" : "c-option"}>
+                            <input
+                              type="radio"
+                              name="treatment"
+                              value={item.treatment.id}
+                              checked={on}
+                              onChange={() => setTreatmentId(item.treatment.id)}
+                            />
+                            <span className="c-option-copy">
+                              <span className="c-option-name">{item.treatment.name}</span>
+                              <span className="c-option-summary">{item.treatment.summary}</span>
+                              <span className="c-option-stats">
+                                {formatMeasure(item.explanation.futureNative, condition.measure)} in 12 weeks. Adherence
+                                used {Math.round(item.features[1] * 100)}%, intensity {item.features[5].toFixed(2)}.
                               </span>
-                              <span>
-                                Adherence used {Math.round(item.features[1] * 100)}%. Intensity {item.features[5].toFixed(2)}.
+                              {item.caution ? <span className="c-caution">{item.caution}</span> : null}
+                            </span>
+                            <span className="c-chance">
+                              <span className="c-chance-figure">{chance}%</span>
+                              <span className="c-chance-label">chance</span>
+                              <span className="c-meter" aria-hidden="true">
+                                <i style={{ width: `${chance}%` }} />
                               </span>
                             </span>
-                            {item.caution ? <span className="c-bad">{item.caution}</span> : null}
-                          </span>
-                          <span className="c-meter" aria-hidden="true">
-                            <i style={{ width: `${Math.round(item.explanation.probability * 100)}%` }} />
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </fieldset>
-                </section>
+                          </label>
+                        )
+                      })}
+                    </fieldset>
+                  </section>
+                  <section className="c-sheet c-record" aria-labelledby="record-heading">
+                    <h2 id="record-heading">On the record</h2>
+                    <dl className="c-facts">
+                      <div>
+                        <dt>Problems</dt>
+                        <dd>
+                          <ul>
+                            {[condition.name, ...patient.problems].map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Medicines</dt>
+                        <dd>
+                          <ul>
+                            {patient.medications.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Note</dt>
+                        <dd className="c-note">{patient.note || "No note on the record."}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                </div>
                 <NetworkPanel
                   projection={selected}
                   measure={condition.measure}
@@ -367,6 +419,27 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   )
 }
 
+function Sparkline({ readings }: { readings: { value: number }[] }) {
+  const values = readings.map((reading) => reading.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  const points = values
+    .map((value, index) => {
+      const x = values.length === 1 ? 36 : (index / (values.length - 1)) * 72
+      const y = 2 + (1 - (value - min) / span) * 16
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(" ")
+  const last = points.split(" ").pop()?.split(",") ?? ["72", "10"]
+  return (
+    <svg className="c-spark" viewBox="-2 0 78 20" aria-hidden="true">
+      <polyline points={points} />
+      <circle cx={last[0]} cy={last[1]} r={2.2} />
+    </svg>
+  )
+}
+
 function FilterButton({
   current,
   id,
@@ -379,7 +452,7 @@ function FilterButton({
   children: string
 }) {
   return (
-    <button type="button" className="c-btn" aria-pressed={current === id} onClick={() => onSelect(id)}>
+    <button type="button" className="c-chip" aria-pressed={current === id} onClick={() => onSelect(id)}>
       {children}
     </button>
   )

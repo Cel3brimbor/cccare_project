@@ -21,8 +21,8 @@ export type ChartLayout = {
   active: PlacedPoint | null
 }
 
-const CHART_WIDTH = 640
-const CHART_HEIGHT = 268
+const CHART_WIDTH = 960
+const CHART_HEIGHT = 360
 
 export function timeline(recorded: Reading[], forecast: { date: string; value: number }[]): ChartPoint[] {
   return [
@@ -37,17 +37,20 @@ export function layoutChart(
   activeIndex: number,
   tickLabel: (iso: string) => string,
   valueLabel: (value: number) => string,
+  width = CHART_WIDTH,
 ): ChartLayout {
+  const narrow = width < 560
+  const height = narrow ? 300 : CHART_HEIGHT
   const values = points.map((point) => point.value)
   if (goalValue != null) values.push(goalValue)
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const pad = (max - min) * 0.14 || 1
+  const pad = (max - min) * 0.18 || 1
   const yMin = min - pad
   const yMax = max + pad
-  const plot = { left: 56, right: 16, top: 18, bottom: 36 }
-  const innerW = CHART_WIDTH - plot.left - plot.right
-  const innerH = CHART_HEIGHT - plot.top - plot.bottom
+  const plot = { left: 40, right: narrow ? 104 : 136, top: 32, bottom: 40 }
+  const innerW = width - plot.left - plot.right
+  const innerH = height - plot.top - plot.bottom
   const yOf = (value: number) => plot.top + ((yMax - value) / (yMax - yMin)) * innerH
   const xOf = (index: number) => plot.left + (points.length === 1 ? innerW / 2 : (index / (points.length - 1)) * innerW)
   const placed = points.map((point, index) => ({ ...point, x: xOf(index), y: yOf(point.value) }))
@@ -61,8 +64,8 @@ export function layoutChart(
     label: tickLabel(points[index].date),
   }))
   return {
-    width: CHART_WIDTH,
-    height: CHART_HEIGHT,
+    width,
+    height,
     plot,
     yTicks,
     xTicks,

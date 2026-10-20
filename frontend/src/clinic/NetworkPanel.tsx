@@ -21,9 +21,9 @@ export function NetworkPanel({
   const groups = ["Inputs", "Hidden units", "Outputs"]
 
   return (
-    <section className="c-card c-span-12" aria-labelledby="network-heading">
-      <h2 id="network-heading">Response network</h2>
-      <p>
+    <section className="c-sheet c-network-sheet" aria-labelledby="network-heading">
+      <h2 id="network-heading">How the projection is worked out</h2>
+      <p className="c-meta c-measure">
         The projection is this network, not a separate score. Six inputs, four hidden units, two outputs. A hidden unit
         is on only when its weighted sum is above zero. The weights are fixed for every patient. Medicines listed on the
         chart are not inputs. Only the six numbers below are.
@@ -88,52 +88,56 @@ export function NetworkPanel({
         <li>
           <i className="c-swatch neg" aria-hidden="true" /> Negative weight
         </li>
+        <li>Thicker lines carry larger weights.</li>
       </ul>
-      <h3>Inputs used for {projection.treatment.name}</h3>
-      <div className="c-table-wrap">
-        <table className="c-table">
-          <thead>
-            <tr>
-              <th scope="col">Input</th>
-              <th scope="col" className="c-num">
-                Value
-              </th>
-              <th scope="col">Meaning</th>
-            </tr>
-          </thead>
-          <tbody>
-            {explanation.inputs.map((input) => (
-              <tr key={input.label} className={unit.label === input.label ? "is-on" : undefined}>
-                <th scope="row">{input.label}</th>
-                <td className="c-num">{input.value.toFixed(4)}</td>
-                <td>{input.detail}</td>
+      <details className="c-disclose">
+        <summary>Inputs and weights for {projection.treatment.name}</summary>
+        <h3>Inputs used for {projection.treatment.name}</h3>
+        <div className="c-table-wrap">
+          <table className="c-table">
+            <thead>
+              <tr>
+                <th scope="col">Input</th>
+                <th scope="col" className="c-num">
+                  Value
+                </th>
+                <th scope="col">Meaning</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <h3>Hidden-layer weights</h3>
-      <p>Rows are units. Columns are inputs. The bias is added after the products.</p>
-      <WeightTable
-        caption="Hidden layer weights"
-        headers={["Unit", ...INPUTS.map((input) => input.label), "Bias"]}
-        rows={HIDDEN.map((hidden, index) => ({
-          id: `hid-${index}`,
-          label: hidden.label,
-          values: [...W1[index], B1[index]],
-        }))}
-        selected={unit.id}
-      />
-      <h3>Output weights</h3>
-      <WeightTable
-        caption="Output weights"
-        headers={["Output", ...HIDDEN.map((hidden) => hidden.label), "Bias"]}
-        rows={[
-          { id: "out-0", label: "Change in severity", values: [...W2[0], B2[0]] },
-          { id: "out-1", label: "Response", values: [...W2[1], B2[1]] },
-        ]}
-        selected={unit.id}
-      />
+            </thead>
+            <tbody>
+              {explanation.inputs.map((input) => (
+                <tr key={input.label} className={unit.label === input.label ? "is-on" : undefined}>
+                  <th scope="row">{input.label}</th>
+                  <td className="c-num">{input.value.toFixed(4)}</td>
+                  <td>{input.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3>Hidden-layer weights</h3>
+        <p>Rows are units. Columns are inputs. The bias is added after the products.</p>
+        <WeightTable
+          caption="Hidden layer weights"
+          headers={["Unit", ...INPUTS.map((input) => input.label), "Bias"]}
+          rows={HIDDEN.map((hidden, index) => ({
+            id: `hid-${index}`,
+            label: hidden.label,
+            values: [...W1[index], B1[index]],
+          }))}
+          selected={unit.id}
+        />
+        <h3>Output weights</h3>
+        <WeightTable
+          caption="Output weights"
+          headers={["Output", ...HIDDEN.map((hidden) => hidden.label), "Bias"]}
+          rows={[
+            { id: "out-0", label: "Change in severity", values: [...W2[0], B2[0]] },
+            { id: "out-1", label: "Response", values: [...W2[1], B2[1]] },
+          ]}
+          selected={unit.id}
+        />
+      </details>
     </section>
   )
 }
