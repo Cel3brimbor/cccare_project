@@ -33,7 +33,7 @@
     --panel: #181c14;
     --text: #dde1d2;
     --secondary: #8f9783;
-    --tertiary: #79806d;
+    --tertiary: #858c79;
     --accent: #a3c46d;
     --accent-ink: #11140e;
     --fill: rgba(221, 225, 210, 0.07);
@@ -596,7 +596,16 @@ fieldset:disabled { opacity: 0.55; }
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 220px;
+  padding: 8px 12px 10px;
+  border-left: 3px solid var(--accent);
+  background: var(--fill);
 }
+.bubble.net.is-negative { border-left-color: var(--neg); }
+.prob-bar { display: block; height: 4px; margin: 6px 0 4px; background: var(--fill-strong); }
+.prob-bar b { display: block; height: 100%; background: var(--accent); }
+.bubble.net.is-negative .prob-bar b { background: var(--neg); }
+.bubble.net small { font-family: var(--mono); }
 .bubble.net strong {
   font-size: 2.4rem;
   line-height: 0.95;
@@ -606,7 +615,22 @@ fieldset:disabled { opacity: 0.55; }
 }
 .bubble.net span { font-weight: 590; letter-spacing: -0.02em; }
 .bubble.net small { color: var(--secondary); font-size: 0.75rem; }
-.suggestions { display: flex; flex-direction: column; gap: 6px; padding: 0 16px 8px; align-items: flex-start; }
+.suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 8px; align-items: flex-start; }
+.sample {
+  appearance: none;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px dashed var(--separator);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8125rem;
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.sample:hover:not(:disabled) { background: var(--fill); border-style: solid; border-color: var(--accent); }
+.sample:disabled { opacity: 0.45; }
 .suggestions button { text-align: left; }
 .composer { display: flex; gap: 8px; align-items: end; padding: 8px 12px 14px; }
 .composer textarea {

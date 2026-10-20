@@ -10,11 +10,11 @@
   --rule-strong: #868c7a;
   --ecg-fine: #d3d7c7;
   --ecg-major: #b2b8a2;
-  --signal: #b3321b;
+  --signal: #a62d17;
   --signal-wash: #f1dcd3;
   --ward: #91550d;
   --ward-wash: #efe1c7;
-  --mend: #46661f;
+  --mend: #3f5d1b;
   --pos: #91550d;
   --neg: #3d5a6c;
   --focus: #91550d;
@@ -999,7 +999,7 @@
     --ink: #dde1d2;
     --graphite: #8f9783;
     --rule: #2b3124;
-    --rule-strong: #4a5240;
+    --rule-strong: #66705a;
     --ecg-fine: #1e2319;
     --ecg-major: #2d3426;
     --signal: #ec7a5f;

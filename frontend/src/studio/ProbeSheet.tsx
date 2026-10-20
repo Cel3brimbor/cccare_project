@@ -165,8 +165,11 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
         {messages.map((message) => (
           <div key={message.id} className="exchange">
             <p className="bubble user">{message.text}</p>
-            <div className="bubble net">
+            <div className={message.pred === 1 ? "bubble net is-positive" : "bubble net is-negative"}>
               <strong>{message.pred}</strong>
+              <i className="prob-bar" aria-hidden="true">
+                <b style={{ width: `${Math.round(message.prob * 100)}%` }} />
+              </i>
               <span>
                 {message.pred === 1 ? "Positive" : "Negative"} · {formatNum(message.prob, 3)}
               </span>
@@ -180,9 +183,9 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
         ))}
         <div ref={endRef} />
       </div>
-      <div className="suggestions">
+      <div className="suggestions" role="group" aria-label="Example reviews">
         {samples.map((sample) => (
-          <button key={sample} type="button" className="text-button" disabled={!ready} onClick={() => submit(sample)}>
+          <button key={sample} type="button" className="sample" disabled={!ready} onClick={() => submit(sample)}>
             {sample}
           </button>
         ))}
