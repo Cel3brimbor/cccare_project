@@ -549,8 +549,8 @@ export function NetworkCanvas({
         ref={canvasRef}
         className="network"
         tabIndex={0}
-        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
-        aria-label="Network graph. Arrow keys move the selected unit. The inspector follows."
+        aria-label="Network graph. Arrow keys move the selected unit and the inspector follows. Space trains or pauses, Period takes one step."
+        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Space Period"
         onKeyDown={onKey}
       />
       <p className="sr" aria-live="polite">
