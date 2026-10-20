@@ -187,8 +187,8 @@ export function NetworkCanvas({
         const scale = percentile(mags, 0.95)
         const groups = new Map<string, { path: Path2D; color: string; alpha: number }>()
         const add = (source: Node, dest: Node, value: number) => {
-          const alpha = Math.pow(Math.min(1, Math.abs(value) / scale), 0.55) * 0.62
-          if (alpha < 0.035) return
+          const alpha = Math.pow(Math.min(1, Math.abs(value) / scale), 1.6) * 0.75
+          if (alpha < 0.04) return
           const color = value >= 0 ? positive : negative
           const bucket = Math.round(alpha * 5) / 5
           const key = `${color}:${bucket}`

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { CaretLeft } from "@phosphor-icons/react"
 import { formatBytes, formatPct } from "./format"
 import { Segmented } from "./Segmented"
 import { clearError, send, useStudio } from "./store"
@@ -76,6 +77,12 @@ export function Toolbar({
   return (
     <header className="toolbar" aria-busy={busy}>
       <div className="brand">
+        {onReturn ? (
+          <button type="button" className="back" onClick={onReturn}>
+            <CaretLeft size={12} weight="bold" aria-hidden="true" />
+            Clinic
+          </button>
+        ) : null}
         <strong>Training bench</strong>
         <span>{task === "digits" ? "Handwritten digits" : "IMDB reviews"}</span>
       </div>
@@ -95,11 +102,6 @@ export function Toolbar({
         {status.message}
       </p>
       <div className="actions">
-        {onReturn ? (
-          <button type="button" className="btn" onClick={onReturn}>
-            Clinic
-          </button>
-        ) : null}
         <button
           type="button"
           data-model-button
@@ -111,6 +113,7 @@ export function Toolbar({
         >
           Model
         </button>
+        <span className="divider" aria-hidden="true" />
         {status.phase === "error" ? (
           <button type="button" className="btn primary" onClick={() => send({ type: "prepare" })}>
             Retry
@@ -183,6 +186,7 @@ export function Toolbar({
             </div>
           )}
         </span>
+        <span className="divider" aria-hidden="true" />
         <span className="tip" title={connected ? undefined : reason}>
           <button
             type="button"

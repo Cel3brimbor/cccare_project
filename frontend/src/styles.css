@@ -6,15 +6,15 @@
   --text: #1b2016;
   --secondary: #535a4a;
   --tertiary: #666d5c;
-  --accent: #4b5f1f;
-  --accent-ink: #f1f3ea;
+  --accent: #91550d;
+  --accent-ink: #f8f1e4;
   --fill: rgba(27, 32, 22, 0.06);
   --fill-strong: rgba(27, 32, 22, 0.11);
   --separator: rgba(27, 32, 22, 0.14);
   --toolbar: rgba(238, 240, 231, 0.96);
   --toolbar-edge: rgba(27, 32, 22, 0.16);
   --shadow: 0 14px 32px -18px rgba(20, 24, 16, 0.45);
-  --pos: #a3600f;
+  --pos: #4f6420;
   --neg: #3d5a6c;
   --node: #b5baa4;
   --segment: rgba(27, 32, 22, 0.07);
@@ -34,7 +34,7 @@
     --text: #dde1d2;
     --secondary: #8f9783;
     --tertiary: #858c79;
-    --accent: #a3c46d;
+    --accent: #e2a64b;
     --accent-ink: #11140e;
     --fill: rgba(221, 225, 210, 0.07);
     --fill-strong: rgba(221, 225, 210, 0.12);
@@ -42,7 +42,7 @@
     --toolbar: rgba(24, 28, 20, 0.96);
     --toolbar-edge: rgba(221, 225, 210, 0.14);
     --shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.6);
-    --pos: #e2a64b;
+    --pos: #a3c46d;
     --neg: #86a9bd;
     --node: #3a4232;
     --segment: rgba(221, 225, 210, 0.07);
@@ -180,7 +180,26 @@ button:disabled { cursor: not-allowed; }
 }
 .status-line.is-error { color: var(--text); }
 .epoch { margin-left: auto; white-space: nowrap; }
-.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
+.divider { width: 1px; height: 20px; margin: 0 4px; background: var(--separator); }
+.back {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  margin: -2px 0 2px -2px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.back:hover { text-decoration: underline; }
 .tip { display: inline-flex; }
 .progress {
   position: absolute;
@@ -602,12 +621,14 @@ fieldset:disabled { opacity: 0.55; }
   background: var(--fill);
 }
 .bubble.net.is-negative { border-left-color: var(--neg); }
+.bubble.net.is-positive { border-left-color: var(--pos); }
+.bubble.net.is-positive .prob-bar b { background: var(--pos); }
 .prob-bar { display: block; height: 4px; margin: 6px 0 4px; background: var(--fill-strong); }
 .prob-bar b { display: block; height: 100%; background: var(--accent); }
 .bubble.net.is-negative .prob-bar b { background: var(--neg); }
 .bubble.net small { font-family: var(--mono); }
 .bubble.net strong {
-  font-size: 2.4rem;
+  font-size: 1.75rem;
   line-height: 0.95;
   letter-spacing: 0;
   font-weight: 700;

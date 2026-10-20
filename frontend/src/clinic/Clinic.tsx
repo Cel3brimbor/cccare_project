@@ -13,6 +13,15 @@ import "./clinic.css"
 
 type Filter = "all" | "worsening"
 
+const MEASURE_TAGS: Record<string, string> = {
+  hba1c: "HbA1c",
+  symptom: "Symptoms",
+  phq9: "PHQ-9",
+  pain: "Pain",
+  copd: "Symptoms",
+  sbp: "SBP",
+}
+
 function patientIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/patients\/([^/?#]+)/)
   return match ? decodeURIComponent(match[1]) : null
@@ -61,6 +70,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   const latest = patient?.readings[patient.readings.length - 1]
   const delta = patient ? recentDelta(patient.readings) : 0
   const course = patient && condition ? courseOf(delta, condition.measure) : "Stable"
+  const summary = selected && condition ? lead(selected, ranked, condition.measure) : { headline: "", detail: "" }
 
   useEffect(() => {
     setArmed(false)
@@ -211,7 +221,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
             </button>
             <button ref={newButton} type="button" className="c-btn c-btn-primary" onClick={() => setFormOpen(true)}>
               <UserPlus size={20} aria-hidden="true" />
-              New patient
+              <span className="c-btn-label">New patient</span>
             </button>
           </div>
         </header>
@@ -273,7 +283,12 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                             onClick={() => select(item.id)}
                           >
                             <span className="c-patient-name">{fullName(item)}</span>
-                            <span className="c-patient-value">{formatMeasure(itemLatest.value, itemCondition.measure)}</span>
+                            <span className="c-patient-value">
+                              <span className="c-patient-tag">{MEASURE_TAGS[itemCondition.measure.id] ?? itemCondition.measure.name}</span>
+                              {itemCondition.measure.unit === "mmHg"
+                                ? itemLatest.value.toFixed(itemCondition.measure.decimals)
+                                : formatMeasure(itemLatest.value, itemCondition.measure)}
+                            </span>
                             <span className="c-patient-meta">{itemCondition.name}</span>
                             <Sparkline readings={item.readings} />
                           </button>
@@ -370,7 +385,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                   <div>
                     <dt>Adherence</dt>
                     <dd className="c-figure">{Math.round(patient.adherence * 100)}%</dd>
-                    <dd className="c-meta">Share of the current plan being followed.</dd>
+                    <dd className="c-meta">Of the current plan.</dd>
                   </div>
                   <div>
                     <dt>In 12 weeks</dt>
@@ -378,8 +393,8 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                       {formatMeasure(selected.explanation.futureNative, condition.measure)}
                     </dd>
                     <dd className="c-meta">
-                      {selected.treatment.name}. {Math.round(selected.explanation.probability * 100)}% chance of a drop
-                      of at least {formatGoal(condition.measure)}.
+                      {Math.round(selected.explanation.probability * 100)}% chance of a {formatGoal(condition.measure)} drop
+                      on the selected option.
                     </dd>
                   </div>
                 </dl>
@@ -387,9 +402,10 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
                   <section className="c-sheet c-course" aria-labelledby="course-heading">
                     <div className="c-sheet-head">
                       <h2 id="course-heading">Course and projection</h2>
-                      <p className="c-lead" aria-live="polite">
-                        {lead(patient.given, condition.measure.name, selected, ranked, condition.measure)}
-                      </p>
+                      <div className="c-lead" aria-live="polite">
+                        <p className="c-verdict">{summary.headline}</p>
+                        <p>{summary.detail}</p>
+                      </div>
                     </div>
                     <TrendChart
                       key={patient.id}
@@ -584,13 +600,15 @@ function changeText(delta: number, measure: { decimals: number; unit: string; lo
   return `${word} ${formatMeasure(Math.abs(delta), measure)}`
 }
 
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
+
 function lead(
-  given: string,
-  measureName: string,
   selected: ReturnType<typeof projectAll>[number],
   ranked: ReturnType<typeof projectAll>,
   measure: Parameters<typeof formatMeasure>[1],
-): string {
+): { headline: string; detail: string } {
   const current = selected.explanation.currentNative
   const future = selected.explanation.futureNative
   const chance = Math.round(selected.explanation.probability * 100)
@@ -599,19 +617,17 @@ function lead(
   const goalText = formatGoal(measure)
   const landing =
     drop > band
-      ? `down to ${formatMeasure(future, measure)}`
+      ? `down from ${formatMeasure(current, measure)} today`
       : drop < -band
-        ? `up to ${formatMeasure(future, measure)}`
-        : `near ${formatMeasure(future, measure)}, close to the latest result`
-  const reaches = drop + 1e-6 >= measure.goal
-  const outcome = reaches
-    ? `${selected.treatment.name} projects ${landing} in 12 weeks, which meets a drop of ${goalText}. The chance of that drop is ${chance}%.`
-    : `${selected.treatment.name} projects ${landing} in 12 weeks. That line does not reach a drop of ${goalText}. The chance of a drop that large is ${chance}%.`
-  const best = ranked[0]
-  const bestChance = best ? Math.round(best.explanation.probability * 100) : chance
-  const tail =
-    best && selected.treatment.id !== best.treatment.id
-      ? `${best.treatment.name} has the highest chance, ${bestChance}%.`
-      : `That is the highest chance of the ${ranked.length} options.`
-  return `${given}'s recorded ${measureName} is ${formatMeasure(current, measure)}. ${outcome} ${tail}`
+        ? `up from ${formatMeasure(current, measure)} today`
+        : `about the same as today's ${formatMeasure(current, measure)}`
+  const best = ranked[0] ?? selected
+  const bestChance = Math.round(best.explanation.probability * 100)
+  const headline =
+    bestChance >= 50
+      ? `Best chance: ${lowerFirst(best.treatment.name)}, ${bestChance}%.`
+      : `No option is likely to bring a drop of ${goalText}. Best chance: ${lowerFirst(best.treatment.name)}, ${bestChance}%.`
+  const which = selected.treatment.id === best.treatment.id ? `Selected, best of ${ranked.length}` : "Selected"
+  const detail = `${which}: ${lowerFirst(selected.treatment.name)}. Projected ${formatMeasure(future, measure)} in 12 weeks, ${landing}. ${chance}% chance of a drop of at least ${goalText}.`
+  return { headline, detail }
 }

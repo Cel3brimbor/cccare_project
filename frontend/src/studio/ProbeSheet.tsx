@@ -166,12 +166,12 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
           <div key={message.id} className="exchange">
             <p className="bubble user">{message.text}</p>
             <div className={message.pred === 1 ? "bubble net is-positive" : "bubble net is-negative"}>
-              <strong>{message.pred}</strong>
+              <strong>{message.pred === 1 ? "Positive" : "Negative"}</strong>
               <i className="prob-bar" aria-hidden="true">
                 <b style={{ width: `${Math.round(message.prob * 100)}%` }} />
               </i>
               <span>
-                {message.pred === 1 ? "Positive" : "Negative"} · {formatNum(message.prob, 3)}
+                Output {message.pred}, {Math.round(message.prob * 100)}% positive
               </span>
               <small>
                 σ({formatNum(message.logit, 3)}) = {formatNum(message.prob, 3)}
@@ -184,7 +184,7 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
         <div ref={endRef} />
       </div>
       <div className="suggestions" role="group" aria-label="Example reviews">
-        {samples.map((sample) => (
+        {samples.filter((sample) => !messages.some((message) => message.text === sample)).map((sample) => (
           <button key={sample} type="button" className="sample" disabled={!ready} onClick={() => submit(sample)}>
             {sample}
           </button>

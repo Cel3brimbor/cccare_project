@@ -48,10 +48,14 @@ export function layoutChart(
   alternatives.forEach((series) => values.push(...series))
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const pad = (max - min) * 0.18 || 1
-  const yMin = min - pad
-  const yMax = max + pad
-  const plot = { left: 40, right: narrow ? 104 : 136, top: 32, bottom: 40 }
+  const range = max - min || 1
+  const rough = range / 3
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)))
+  const norm = rough / magnitude
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * magnitude
+  const yMin = Math.floor((min - range * 0.06) / step) * step
+  const yMax = Math.ceil((max + range * 0.06) / step) * step
+  const plot = { left: 40, right: narrow ? 12 : 136, top: 32, bottom: 40 }
   const innerW = width - plot.left - plot.right
   const innerH = height - plot.top - plot.bottom
   const yOf = (value: number) => plot.top + ((yMax - value) / (yMax - yMin)) * innerH
@@ -60,7 +64,8 @@ export function layoutChart(
   const recorded = placed.filter((point) => point.kind === "recorded")
   const lastRecorded = recorded[recorded.length - 1]
   const projected = lastRecorded ? [lastRecorded, ...placed.filter((point) => point.kind === "projected")] : []
-  const yTicks = [yMax, (yMax + yMin) / 2, yMin].map((value) => ({ y: yOf(value), label: valueLabel(value) }))
+  const yTicks: { y: number; label: string }[] = []
+  for (let value = yMin; value <= yMax + step / 2; value += step) yTicks.push({ y: yOf(value), label: valueLabel(value) })
   const tickIndexes = [0, Math.max(0, recorded.length - 1), points.length - 1]
   const xTicks = [...new Set(tickIndexes)].map((index) => ({
     x: xOf(index),
