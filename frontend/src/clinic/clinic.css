@@ -117,6 +117,7 @@
   font-stretch: var(--condensed);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .c-brand-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--command-dim); font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.04em; }
