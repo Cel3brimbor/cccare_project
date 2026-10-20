@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { CheckCircle, DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
 import { CommandPalette, type PaletteAction } from "./CommandPalette"
 import { NetworkPanel } from "./NetworkPanel"
@@ -48,6 +48,8 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   const newButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const main = useRef<HTMLElement>(null)
+  const shell = useRef<HTMLDivElement>(null)
+  const bar = useRef<HTMLElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const returnFocus = useRef<"opener" | "chart" | null>(null)
   const patients = useMemo(() => [...MOCK_PATIENTS, ...added], [added])
@@ -121,6 +123,17 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     returnFocus.current = null
     target?.focus()
   }, [paletteOpen, patient?.id])
+
+  useLayoutEffect(() => {
+    const node = bar.current
+    const root = shell.current
+    if (!node || !root) return
+    const fit = () => root.style.setProperty("--bar", `${Math.ceil(node.offsetHeight + node.offsetTop)}px`)
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   function select(id: string, focusChart = true) {
     setPatientId(id)
@@ -226,8 +239,8 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
           </p>
         ) : null}
       </div>
-      <div className="c-shell" inert={formOpen || paletteOpen}>
-        <header className="c-topbar">
+      <div className="c-shell" ref={shell} inert={formOpen || paletteOpen}>
+        <header className="c-topbar" ref={bar}>
           <div className="c-brand">
             <Pulse size={22} weight="bold" aria-hidden="true" />
             <p className="c-brand-name">Meridian Clinical</p>
