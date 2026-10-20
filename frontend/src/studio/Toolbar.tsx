@@ -20,6 +20,7 @@ export function Toolbar({
 }) {
   const { device, system, status, metrics, connected, error, task } = useStudio()
   const [armed, setArmed] = useState(false)
+  const [machine, setMachine] = useState(false)
   const confirmRef = useRef<HTMLButtonElement>(null)
   const running = status.phase === "running"
   const blocked = !connected || !status.metal || status.phase === "preparing" || status.phase === "evaluating"
@@ -80,7 +81,7 @@ export function Toolbar({
         {onReturn ? (
           <button type="button" className="back" onClick={onReturn}>
             <CaretLeft size={12} weight="bold" aria-hidden="true" />
-            Clinic
+            Meridian Clinical
           </button>
         ) : null}
         <h1>Training bench</h1>
@@ -213,7 +214,16 @@ export function Toolbar({
             <small>{link}</small>
           </span>
         </div>
-        <p className="vitals" title={tooltip}>
+        <button
+          type="button"
+          className="machine-toggle"
+          aria-expanded={machine}
+          aria-controls="machine-vitals"
+          onClick={() => setMachine((open) => !open)}
+        >
+          {machine ? "Hide machine" : "Machine"}
+        </button>
+        <p id="machine-vitals" className={machine ? "vitals is-open" : "vitals"} title={tooltip}>
           <span>CPU {system ? formatPct(system.cpu) : "—"}</span>
           <span>Memory {memory}</span>
           {system?.gpuUtil != null && <span>GPU {system.gpuUtil}%</span>}

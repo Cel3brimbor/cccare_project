@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
-import { CheckCircle, DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
+import { CaretDown, CheckCircle, DownloadSimple, MagnifyingGlass, Pulse, UserPlus, WarningOctagon } from "@phosphor-icons/react"
 import { CommandPalette, type PaletteAction } from "./CommandPalette"
 import { NetworkPanel } from "./NetworkPanel"
 import { PatientForm } from "./PatientForm"
@@ -43,6 +43,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
   const [filter, setFilter] = useState<Filter>("all")
   const [formOpen, setFormOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const [treatmentId, setTreatmentId] = useState<string | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [unitId, setUnitId] = useState("out-1")
@@ -149,7 +150,13 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
     setPatientId(id)
     const next = `#/patients/${encodeURIComponent(id)}`
     if (window.location.hash !== next) window.location.hash = next
-    if (focusChart) requestAnimationFrame(() => heading.current?.focus())
+    if (!focusChart) return
+    const narrow = window.matchMedia("(max-width: 860px)").matches
+    if (narrow) setListOpen(false)
+    requestAnimationFrame(() => {
+      heading.current?.focus({ preventScroll: true })
+      heading.current?.scrollIntoView({ block: "start", behavior: narrow ? "smooth" : "auto" })
+    })
   }
 
   function stepThrough(event: KeyboardEvent<HTMLElement>) {
@@ -291,92 +298,105 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
         </header>
         <div className="c-frame">
           <aside className="c-census" aria-label="Patients" onKeyDown={stepThrough}>
-            <div className="c-census-tools">
-              <label className="c-search" htmlFor="patient-search">
-                <MagnifyingGlass size={18} aria-hidden="true" />
-                <span className="sr">Search patients</span>
-                <input
-                  id="patient-search"
-                  type="search"
-                  placeholder="Name, MRN or condition"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <div className="c-filters" role="group" aria-label="Filter records">
-                <FilterButton current={filter} id="all" onSelect={setFilter}>
-                  {`All ${patients.length}`}
-                </FilterButton>
-                <FilterButton current={filter} id="worsening" onSelect={setFilter}>
-                  Worsening only
-                </FilterButton>
+            <button
+              type="button"
+              className="c-census-toggle"
+              aria-expanded={listOpen}
+              aria-controls="patient-list"
+              onClick={() => setListOpen((open) => !open)}
+            >
+              <span>{listOpen ? "Hide patients" : "Patients"}</span>
+              <span className="c-count">{patients.length}</span>
+              <CaretDown size={16} weight="bold" aria-hidden="true" />
+            </button>
+            <div id="patient-list" className={listOpen ? "c-census-body is-open" : "c-census-body"}>
+              <div className="c-census-tools">
+                <label className="c-search" htmlFor="patient-search">
+                  <MagnifyingGlass size={18} aria-hidden="true" />
+                  <span className="sr">Search patients</span>
+                  <input
+                    id="patient-search"
+                    type="search"
+                    placeholder="Name, MRN or condition"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </label>
+                <div className="c-filters" role="group" aria-label="Filter records">
+                  <FilterButton current={filter} id="all" onSelect={setFilter}>
+                    {`All ${patients.length}`}
+                  </FilterButton>
+                  <FilterButton current={filter} id="worsening" onSelect={setFilter}>
+                    Worsening only
+                  </FilterButton>
+                </div>
               </div>
-            </div>
-            {visible.length === 0 ? (
-              <div className="c-empty">
-                <p>No patient matches that search.</p>
+              {visible.length === 0 ? (
+                <div className="c-empty">
+                  <p>No patient matches that search.</p>
+                  <button
+                    type="button"
+                    className="c-btn"
+                    onClick={() => {
+                      setQuery("")
+                      setFilter("all")
+                    }}
+                  >
+                    {query ? "Clear search" : `Show all ${patients.length}`}
+                  </button>
+                </div>
+              ) : (
+                groups.map((group) => (
+                  <section key={group.name} className="c-group" aria-labelledby={`group-${group.name}`}>
+                    <h2 id={`group-${group.name}`} className={`c-group-title is-${group.name.toLowerCase()}`}>
+                      {group.name}
+                      <span className="c-count">{group.items.length}</span>
+                    </h2>
+                    <ul className="c-patient-list">
+                      {group.items.map((item) => {
+                        const itemCondition = conditionById(item.conditionId)
+                        const itemLatest = item.readings[item.readings.length - 1]
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              className={`c-patient is-${group.name.toLowerCase()}`}
+                              aria-current={item.id === patient?.id ? "true" : undefined}
+                              data-id={item.id}
+                              onClick={() => select(item.id)}
+                            >
+                              <span className="c-patient-name">{fullName(item)}</span>
+                              <span className="c-patient-value">
+                                <span className="c-patient-tag">{MEASURE_TAGS[itemCondition.measure.id] ?? itemCondition.measure.name}</span>
+                                {itemCondition.measure.unit === "mmHg"
+                                  ? itemLatest.value.toFixed(itemCondition.measure.decimals)
+                                  : formatMeasure(itemLatest.value, itemCondition.measure)}
+                              </span>
+                              <span className="c-patient-meta" title={itemCondition.name}>
+                                {SHORT_CONDITIONS[itemCondition.id] ?? itemCondition.name}
+                              </span>
+                              <Sparkline readings={item.readings} />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </section>
+                ))
+              )}
+              {visible.length > 0 && (query || filter !== "all") ? (
                 <button
                   type="button"
-                  className="c-btn"
+                  className="c-btn c-btn-quiet"
                   onClick={() => {
                     setQuery("")
                     setFilter("all")
                   }}
                 >
-                  Clear search
+                  {query ? "Clear search" : `Show all ${patients.length}`}
                 </button>
-              </div>
-            ) : (
-              groups.map((group) => (
-                <section key={group.name} className="c-group" aria-labelledby={`group-${group.name}`}>
-                  <h2 id={`group-${group.name}`} className={`c-group-title is-${group.name.toLowerCase()}`}>
-                    {group.name}
-                    <span className="c-count">{group.items.length}</span>
-                  </h2>
-                  <ul className="c-patient-list">
-                    {group.items.map((item) => {
-                      const itemCondition = conditionById(item.conditionId)
-                      const itemLatest = item.readings[item.readings.length - 1]
-                      return (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            className={`c-patient is-${group.name.toLowerCase()}`}
-                            aria-current={item.id === patient?.id ? "true" : undefined}
-                            data-id={item.id}
-                            onClick={() => select(item.id)}
-                          >
-                            <span className="c-patient-name">{fullName(item)}</span>
-                            <span className="c-patient-value">
-                              <span className="c-patient-tag">{MEASURE_TAGS[itemCondition.measure.id] ?? itemCondition.measure.name}</span>
-                              {itemCondition.measure.unit === "mmHg"
-                                ? itemLatest.value.toFixed(itemCondition.measure.decimals)
-                                : formatMeasure(itemLatest.value, itemCondition.measure)}
-                            </span>
-                            <span className="c-patient-meta" title={itemCondition.name}>
-                              {SHORT_CONDITIONS[itemCondition.id] ?? itemCondition.name}
-                            </span>
-                            <Sparkline readings={item.readings} />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              ))
-            )}
-            {visible.length > 0 && (query || filter !== "all") ? (
-              <button
-                type="button"
-                className="c-btn c-btn-quiet"
-                onClick={() => {
-                  setQuery("")
-                  setFilter("all")
-                }}
-              >
-                Clear search
-              </button>
-            ) : null}
+              ) : null}
+            </div>
           </aside>
           <main className="c-main" ref={main}>
             {missing ? (

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react"
+import { usePrefers } from "./media"
 
 type RGB = [number, number, number]
 
@@ -50,6 +51,7 @@ export function Heatmap({
   onSelect?: (column: number) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const dark = usePrefers("(prefers-color-scheme: dark)")
   const layoutRef = useRef({ cell: 1, cols: 0 })
   const selectRef = useRef(onSelect)
   selectRef.current = onSelect
@@ -108,7 +110,7 @@ export function Heatmap({
       context.strokeRect(0.5, cursor * tall + 0.5, cols * cell - 1, tall - 1)
       context.globalAlpha = 1
     }
-  }, [matrix, selected, cursor, mode])
+  }, [matrix, selected, cursor, mode, dark])
 
   function pick(event: ReactPointerEvent<HTMLCanvasElement>) {
     const layout = layoutRef.current

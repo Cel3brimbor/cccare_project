@@ -71,6 +71,12 @@ export function TrendChart({
   const labelX = inset ? plotRight - 6 : plotRight + 12
   const labelAnchor = inset ? "end" : "start"
   const labelLift = inset ? -12 : 4
+  const readoutClash =
+    inset &&
+    chart.active !== null &&
+    Math.abs(chart.active.y - 12 - (endLabelY + labelLift)) < 16 &&
+    chart.active.x + 110 > plotRight - 100
+  const litDelta = lit ? lit.values[lit.values.length - 1] - endValue : 0
 
   useLayoutEffect(() => {
     settled.current = frameWidth
@@ -218,7 +224,8 @@ export function TrendChart({
               ) : null}
               {lit && litEnd ? (
                 <text x={labelX} y={litLabelY + labelLift} textAnchor={labelAnchor} className="c-direct is-alt">
-                  Preview {formatMeasure(lit.values[lit.values.length - 1], measure)}
+                  Preview {formatMeasure(lit.values[lit.values.length - 1], measure)} ({litDelta >= 0 ? "+" : "−"}
+                  {Math.abs(litDelta).toFixed(measure.decimals)})
                 </text>
               ) : null}
               {chart.recorded.map((point) => (
@@ -237,7 +244,7 @@ export function TrendChart({
                     <path d="M -15 0 H -9 M 9 0 H 15 M 0 -15 V -9 M 0 9 V 15" />
                     <text
                       x={chart.active.x > plotRight - 90 ? -14 : 14}
-                      y={-12}
+                      y={readoutClash ? 26 : -12}
                       textAnchor={chart.active.x > plotRight - 90 ? "end" : "start"}
                       className="c-active-label"
                     >

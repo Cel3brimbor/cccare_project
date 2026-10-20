@@ -1,22 +1,15 @@
 import type { Measure, Patient } from "./types"
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
 export function formatDate(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number)
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)))
+  return `${day} ${MONTHS[month - 1]} ${year}`
 }
 
 export function formatDay(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number)
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)))
+  const [, month, day] = iso.split("-").map(Number)
+  return `${day} ${MONTHS[month - 1]}`
 }
 
 export function formatMeasure(value: number, measure: Measure): string {
