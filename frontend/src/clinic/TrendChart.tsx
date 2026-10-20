@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react"
-import { motion, useReducedMotion } from "motion/react"
+import { LazyMotion, domAnimation, useReducedMotion } from "motion/react"
+import * as m from "motion/react-m"
 import { formatDate, formatDay, formatMeasure } from "./format"
 import { layoutChart, pointsAttr, timeline } from "./figures"
 import type { Measure, Reading } from "./types"
@@ -103,168 +104,170 @@ export function TrendChart({
   }
 
   return (
-    <div className="c-chart-block" ref={frame}>
-      <p id={describe} className="sr">
-        Recorded {measure.name} as a solid line, the projection for {treatmentName} as a dashed line, other options as
-        dotted lines, and the goal as a dotted line. Higher is worse.
-      </p>
-      <div
-        className="c-plot"
-        role="slider"
-        tabIndex={0}
-        aria-label="Read a point on the chart"
-        aria-describedby={describe}
-        aria-valuemin={0}
-        aria-valuemax={Math.max(0, points.length - 1)}
-        aria-valuenow={safeIndex}
-        aria-valuetext={active ? `${formatDate(active.date)}, ${active.kind} ${formatMeasure(active.value, measure)}` : undefined}
-        onKeyDown={key}
-      >
-        {frameWidth === null ? null : (
-          <svg
-            className="c-chart-svg"
-            viewBox={`0 0 ${chart.width} ${chart.height}`}
-            aria-hidden="true"
-            onPointerMove={track}
-          >
-            <defs>
-              <pattern id="c-ecg" width={40} height={40} patternUnits="userSpaceOnUse" x={chart.plot.left} y={chart.plot.top}>
-                <path d="M 40 0 V 40 M 0 40 H 40" className="c-grid-major" />
-              </pattern>
-            </defs>
-            <rect
-              x={chart.plot.left}
-              y={chart.plot.top}
-              width={innerW}
-              height={plotBottom - chart.plot.top}
-              fill="url(#c-ecg)"
-              className="c-paper"
-            />
-            {today ? (
+    <LazyMotion features={domAnimation}>
+      <div className="c-chart-block" ref={frame}>
+        <p id={describe} className="sr">
+          Recorded {measure.name} as a solid line, the projection for {treatmentName} as a dashed line, other options as
+          dotted lines, and the goal as a dotted line. Higher is worse.
+        </p>
+        <div
+          className="c-plot"
+          role="slider"
+          tabIndex={0}
+          aria-label="Read a point on the chart"
+          aria-describedby={describe}
+          aria-valuemin={0}
+          aria-valuemax={Math.max(0, points.length - 1)}
+          aria-valuenow={safeIndex}
+          aria-valuetext={active ? `${formatDate(active.date)}, ${active.kind} ${formatMeasure(active.value, measure)}` : undefined}
+          onKeyDown={key}
+        >
+          {frameWidth === null ? null : (
+            <svg
+              className="c-chart-svg"
+              viewBox={`0 0 ${chart.width} ${chart.height}`}
+              aria-hidden="true"
+              onPointerMove={track}
+            >
+              <defs>
+                <pattern id="c-ecg" width={40} height={40} patternUnits="userSpaceOnUse" x={chart.plot.left} y={chart.plot.top}>
+                  <path d="M 40 0 V 40 M 0 40 H 40" className="c-grid-major" />
+                </pattern>
+              </defs>
               <rect
-                x={today.x}
+                x={chart.plot.left}
                 y={chart.plot.top}
-                width={plotRight - today.x}
+                width={innerW}
                 height={plotBottom - chart.plot.top}
-                className="c-future"
+                fill="url(#c-ecg)"
+                className="c-paper"
               />
-            ) : null}
-            {chart.yTicks.map((tick) => (
-              <text key={tick.label} x={chart.plot.left - 10} y={tick.y + 4} textAnchor="end" className="c-tick">
-                {tick.label}
-              </text>
-            ))}
-            {chart.xTicks.map((tick) => (
-              <text
-                key={tick.label}
-                x={tick.x}
-                y={chart.height - 14}
-                textAnchor={inset && tick.x > plotRight - 30 ? "end" : "middle"}
-                className="c-tick"
-              >
-                {tick.label}
-              </text>
-            ))}
-            {today ? (
-              <g>
-                <line x1={today.x} x2={today.x} y1={chart.plot.top - 12} y2={plotBottom} className="c-today" />
-                <text x={today.x + 6} y={chart.plot.top - 14} className="c-direct">
-                  Today
+              {today ? (
+                <rect
+                  x={today.x}
+                  y={chart.plot.top}
+                  width={plotRight - today.x}
+                  height={plotBottom - chart.plot.top}
+                  className="c-future"
+                />
+              ) : null}
+              {chart.yTicks.map((tick) => (
+                <text key={tick.label} x={chart.plot.left - 10} y={tick.y + 4} textAnchor="end" className="c-tick">
+                  {tick.label}
                 </text>
-              </g>
-            ) : null}
-            {chart.goal ? (
-              <g>
-                <line x1={chart.plot.left} x2={plotRight} y1={chart.goal.y} y2={chart.goal.y} className="c-goal" />
-                <text x={labelX} y={goalLabelY + labelLift} textAnchor={labelAnchor} className="c-direct is-goal">
-                  Goal {formatMeasure(goal, measure)}
-                </text>
-              </g>
-            ) : null}
-            {alternatives.filter((item) => !inset || item.id === highlightId).map((item) => {
-              const line = pathOf(chart.place(item.values))
-              const lit = item.id === highlightId
-              return (
-                <g key={item.id} className={lit ? "c-alt is-lit" : "c-alt"}>
-                  <path d={line} className="c-alt-line" />
-                  {onChoose ? (
-                    <path d={line} className="c-alt-hit" onClick={() => onChoose(item.id)}>
-                      <title>{item.name}</title>
-                    </path>
-                  ) : null}
-                </g>
-              )
-            })}
-            <polyline points={pointsAttr(chart.recorded)} className="c-series recorded" />
-            <motion.path
-              className="c-series projected"
-              initial={false}
-              animate={{ d: pathOf(chart.projected) }}
-              transition={spring}
-            />
-            {end ? (
-              <motion.text
-                x={labelX}
-                textAnchor={labelAnchor}
-                className="c-direct is-projected"
-                initial={false}
-                animate={{ y: endLabelY + labelLift }}
-                transition={spring}
-              >
-                Selected {formatMeasure(endValue, measure)}
-              </motion.text>
-            ) : null}
-            {lit && litEnd ? (
-              <text x={labelX} y={litLabelY + labelLift} textAnchor={labelAnchor} className="c-direct is-alt">
-                Preview {formatMeasure(lit.values[lit.values.length - 1], measure)}
-              </text>
-            ) : null}
-            {chart.recorded.map((point) => (
-              <rect key={point.date} x={point.x - 2} y={point.y - 2} width={4} height={4} className="c-mark" />
-            ))}
-            {chart.active ? (
-              <g className="c-active">
-                <line x1={chart.active.x} x2={chart.active.x} y1={chart.plot.top} y2={plotBottom} className="c-cursor" />
-                <motion.g
-                  className={chart.active.kind === "projected" ? "c-reticle is-projected" : "c-reticle"}
-                  initial={false}
-                  animate={{ x: chart.active.x, y: chart.active.y }}
-                  transition={{ x: { duration: 0 }, y: spring }}
+              ))}
+              {chart.xTicks.map((tick) => (
+                <text
+                  key={tick.label}
+                  x={tick.x}
+                  y={chart.height - 14}
+                  textAnchor={inset && tick.x > plotRight - 30 ? "end" : "middle"}
+                  className="c-tick"
                 >
-                  <circle r={7} className="c-active-point" />
-                  <path d="M -15 0 H -9 M 9 0 H 15 M 0 -15 V -9 M 0 9 V 15" />
-                  <text
-                    x={chart.active.x > plotRight - 90 ? -14 : 14}
-                    y={-12}
-                    textAnchor={chart.active.x > plotRight - 90 ? "end" : "start"}
-                    className="c-active-label"
-                  >
-                    {formatDay(chart.active.date)} {formatMeasure(chart.active.value, measure)}
+                  {tick.label}
+                </text>
+              ))}
+              {today ? (
+                <g>
+                  <line x1={today.x} x2={today.x} y1={chart.plot.top - 12} y2={plotBottom} className="c-today" />
+                  <text x={today.x + 6} y={chart.plot.top - 14} className="c-direct">
+                    Today
                   </text>
-                </motion.g>
-              </g>
-            ) : null}
-          </svg>
-        )}
-      </div>
-      {touched ? null : <p className="c-hint c-reader">
-          {touch ? "Drag across the chart to read a week." : "Move across the chart, or focus it and use the arrow keys."}
-        </p>}
-      <details className="c-disclose">
-        <summary>
-          All readings: {recorded.length} recorded, {forecast.length} projected
-        </summary>
-        <div className="c-split-tables">
-          <ReadingTable title="Recorded" caption={`Recorded ${measure.name}`} rows={recorded} measure={measure} />
-          <ReadingTable
-            title="Projected"
-            caption={`Projected ${measure.name} for ${treatmentName}`}
-            rows={forecast}
-            measure={measure}
-          />
+                </g>
+              ) : null}
+              {chart.goal ? (
+                <g>
+                  <line x1={chart.plot.left} x2={plotRight} y1={chart.goal.y} y2={chart.goal.y} className="c-goal" />
+                  <text x={labelX} y={goalLabelY + labelLift} textAnchor={labelAnchor} className="c-direct is-goal">
+                    Goal {formatMeasure(goal, measure)}
+                  </text>
+                </g>
+              ) : null}
+              {alternatives.filter((item) => !inset || item.id === highlightId).map((item) => {
+                const line = pathOf(chart.place(item.values))
+                const lit = item.id === highlightId
+                return (
+                  <g key={item.id} className={lit ? "c-alt is-lit" : "c-alt"}>
+                    <path d={line} className="c-alt-line" />
+                    {onChoose ? (
+                      <path d={line} className="c-alt-hit" onClick={() => onChoose(item.id)}>
+                        <title>{item.name}</title>
+                      </path>
+                    ) : null}
+                  </g>
+                )
+              })}
+              <polyline points={pointsAttr(chart.recorded)} className="c-series recorded" />
+              <m.path
+                className="c-series projected"
+                initial={false}
+                animate={{ d: pathOf(chart.projected) }}
+                transition={spring}
+              />
+              {end ? (
+                <m.text
+                  x={labelX}
+                  textAnchor={labelAnchor}
+                  className="c-direct is-projected"
+                  initial={false}
+                  animate={{ y: endLabelY + labelLift }}
+                  transition={spring}
+                >
+                  Selected {formatMeasure(endValue, measure)}
+                </m.text>
+              ) : null}
+              {lit && litEnd ? (
+                <text x={labelX} y={litLabelY + labelLift} textAnchor={labelAnchor} className="c-direct is-alt">
+                  Preview {formatMeasure(lit.values[lit.values.length - 1], measure)}
+                </text>
+              ) : null}
+              {chart.recorded.map((point) => (
+                <rect key={point.date} x={point.x - 2} y={point.y - 2} width={4} height={4} className="c-mark" />
+              ))}
+              {chart.active ? (
+                <g className="c-active">
+                  <line x1={chart.active.x} x2={chart.active.x} y1={chart.plot.top} y2={plotBottom} className="c-cursor" />
+                  <m.g
+                    className={chart.active.kind === "projected" ? "c-reticle is-projected" : "c-reticle"}
+                    initial={false}
+                    animate={{ x: chart.active.x, y: chart.active.y }}
+                    transition={{ x: { duration: 0 }, y: spring }}
+                  >
+                    <circle r={7} className="c-active-point" />
+                    <path d="M -15 0 H -9 M 9 0 H 15 M 0 -15 V -9 M 0 9 V 15" />
+                    <text
+                      x={chart.active.x > plotRight - 90 ? -14 : 14}
+                      y={-12}
+                      textAnchor={chart.active.x > plotRight - 90 ? "end" : "start"}
+                      className="c-active-label"
+                    >
+                      {formatDay(chart.active.date)} {formatMeasure(chart.active.value, measure)}
+                    </text>
+                  </m.g>
+                </g>
+              ) : null}
+            </svg>
+          )}
         </div>
-      </details>
-    </div>
+        {touched ? null : <p className="c-hint c-reader">
+            {touch ? "Drag across the chart to read a week." : "Move across the chart, or focus it and use the arrow keys."}
+          </p>}
+        <details className="c-disclose">
+          <summary>
+            All readings: {recorded.length} recorded, {forecast.length} projected
+          </summary>
+          <div className="c-split-tables">
+            <ReadingTable title="Recorded" caption={`Recorded ${measure.name}`} rows={recorded} measure={measure} />
+            <ReadingTable
+              title="Projected"
+              caption={`Projected ${measure.name} for ${treatmentName}`}
+              rows={forecast}
+              measure={measure}
+            />
+          </div>
+        </details>
+      </div>
+    </LazyMotion>
   )
 }
 

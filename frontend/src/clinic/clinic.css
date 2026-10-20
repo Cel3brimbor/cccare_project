@@ -937,6 +937,12 @@
 }
 
 @media (max-width: 420px) {
+  .c-topbar { column-gap: 0.5rem; padding-left: 0.875rem; }
+  .c-topbar .c-actions { gap: 0.375rem; }
+  .c-brand-name { font-size: 0.9375rem; letter-spacing: 0.08em; }
+  .c-topbar .c-jump span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .c-topbar .c-jump kbd { display: none; }
+  .c-topbar .c-jump { flex: 0 0 40px; min-width: 40px; min-height: 40px; justify-content: center; padding: 0; order: 0; }
   .c-topbar .c-btn-label {
     position: absolute;
     width: 1px;
@@ -1153,6 +1159,7 @@
 /* Toast */
 
 .c-toast-region {
+  max-width: calc(100vw - 32px);
   position: fixed;
   left: 50%;
   bottom: 1.5rem;
@@ -1173,7 +1180,6 @@
   color: var(--command-ink);
   font-size: 0.875rem;
   font-weight: 600;
-  white-space: nowrap;
   box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.55);
   animation: c-toast 4500ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
@@ -1193,11 +1199,12 @@
 /* Liquid Glass: the floating controls layer */
 
 .clinic {
-  --glass-dark: rgba(30, 37, 24, 0.86);
-  --glass-light: rgba(240, 242, 233, 0.86);
+  --glass-dark: rgba(30, 37, 24, 0.7);
+  --glass-light: rgba(240, 242, 233, 0.78);
   --glass-rim: rgba(255, 255, 255, 0.16);
   --glass-rim-light: rgba(255, 255, 255, 0.75);
-  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 48%);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 30%);
+  --glass-sheen-light: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
   --glass-shadow: 0 18px 40px -18px rgba(12, 16, 9, 0.55), 0 2px 6px -2px rgba(12, 16, 9, 0.25);
 }
 
@@ -1213,8 +1220,8 @@
   border: 1px solid var(--glass-rim);
   border-radius: 16px;
   background: var(--glass-sheen), var(--glass-dark);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(0.45);
+  backdrop-filter: blur(28px) saturate(180%) brightness(0.45);
   box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
@@ -1243,26 +1250,29 @@
 
 .c-palette {
   border-radius: 18px;
-  background: var(--glass-sheen), var(--glass-light);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
-  box-shadow: 0 30px 70px -24px rgba(12, 16, 9, 0.6), 0 0 0 1px var(--glass-rim-light) inset;
+  background: var(--glass-sheen-light), var(--glass-light);
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.1);
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.1);
+  box-shadow: 0 30px 70px -24px rgba(12, 16, 9, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 1px var(--glass-rim-light) inset;
+  scrollbar-width: thin;
   transform-origin: top center;
   animation: c-materialize 260ms cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
-.c-palette-row { border-radius: 10px; }
+.c-palette-row { border-radius: 12px; }
+.c-palette kbd { border-radius: 6px; }
+.c-palette-list { scrollbar-width: thin; scrollbar-gutter: stable; }
 .c-palette-field input { font-weight: 500; }
-.c-palette-scrim { background: rgba(20, 24, 16, 0.32); }
+.c-palette-scrim { background: rgba(20, 24, 16, 0.32); padding-top: 6px; }
 
 .c-toast {
   border-left: 0;
-  border-radius: 999px;
+  border-radius: 20px;
   padding: 0.625rem 1.125rem 0.625rem 0.875rem;
   background: var(--glass-sheen), var(--glass-dark);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  backdrop-filter: blur(22px) saturate(170%);
-  box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-rim);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(0.45);
+  backdrop-filter: blur(28px) saturate(180%) brightness(0.45);
+  box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-rim), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 @keyframes c-materialize {
@@ -1270,6 +1280,18 @@
 }
 
 @media (max-width: 860px) {
+  .c-shell::before {
+    content: "";
+    position: sticky;
+    top: 0;
+    z-index: 19;
+    display: block;
+    height: 14px;
+    margin-bottom: -14px;
+    background: linear-gradient(var(--paper), transparent);
+    pointer-events: none;
+  }
+
   .c-topbar {
     position: sticky;
     top: 8px;
@@ -1285,11 +1307,20 @@
 
 @media (prefers-color-scheme: dark) {
   .clinic {
-    --glass-dark: rgba(14, 17, 11, 0.84);
-    --glass-light: rgba(26, 31, 21, 0.86);
+    --glass-dark: rgba(14, 17, 11, 0.66);
+    --glass-light: rgba(26, 31, 21, 0.78);
     --glass-rim: rgba(255, 255, 255, 0.1);
     --glass-rim-light: rgba(255, 255, 255, 0.12);
-    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
+    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 30%);
+    --glass-sheen-light: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 40%);
+  }
+
+  .c-palette-scrim { background: rgba(0, 0, 0, 0.55); }
+
+  .c-palette {
+    -webkit-backdrop-filter: blur(32px) saturate(160%) brightness(0.8);
+    backdrop-filter: blur(32px) saturate(160%) brightness(0.8);
+    box-shadow: 0 30px 70px -24px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   }
 
   .c-toast { background: var(--glass-sheen), var(--glass-dark); }

@@ -423,7 +423,7 @@ export function NetworkCanvas({
         const labelX =
           grid && layer === 0 ? column.reduce((sum, node) => sum + node.x, 0) / column.length : column[0].x
         context.fillStyle = selected.layer === layer ? text : ink
-        context.fillText(`${title}  ${sizesRef.current[layer]}`, labelX, labelY)
+        context.fillText(width < 520 ? title : `${title}  ${sizesRef.current[layer]}`, labelX, labelY)
       })
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
