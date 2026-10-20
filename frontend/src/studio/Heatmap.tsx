@@ -35,12 +35,14 @@ function css(color: RGB): string {
 }
 
 export function Heatmap({
+  label = "Matrix",
   matrix,
   selected,
   cursor,
   mode,
   onSelect,
 }: {
+  label?: string
   matrix: number[][]
   selected: number | null
   cursor: number | null
@@ -129,7 +131,7 @@ export function Heatmap({
         if (event.buttons === 1) pick(event)
       }}
       role="img"
-      aria-label="Matrix"
+      aria-label={label}
     />
   )
 }

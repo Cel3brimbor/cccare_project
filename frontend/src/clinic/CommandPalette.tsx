@@ -109,7 +109,7 @@ export function CommandPalette({
           <input
             ref={input}
             role="combobox"
-            aria-expanded="true"
+            aria-expanded={rows.length > 0}
             aria-controls={listId}
             aria-activedescendant={rows.length ? `${listId}-${safeCursor}` : undefined}
             aria-autocomplete="list"
@@ -123,6 +123,9 @@ export function CommandPalette({
           />
           <kbd>Esc</kbd>
         </div>
+        <p className="sr" role="status">
+          {query ? `${rows.length} ${rows.length === 1 ? "result" : "results"}` : ""}
+        </p>
         {rows.length === 0 ? (
           <p className="c-palette-empty">Nothing matches “{query}”. Try a family name, an MRN or a condition.</p>
         ) : (

@@ -107,8 +107,6 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT" || target?.isContentEditable
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
         if (!formOpen) {
@@ -116,10 +114,6 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
           else opener.current = document.activeElement as HTMLElement | null
           setPaletteOpen((open) => !open)
         }
-      } else if (event.key === "/" && !typing && !formOpen) {
-        event.preventDefault()
-        opener.current = document.activeElement as HTMLElement | null
-        setPaletteOpen(true)
       }
     }
     window.addEventListener("keydown", onKey)
@@ -135,7 +129,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
 
   useLayoutEffect(() => {
     const node = bar.current
-    const root = shell.current
+    const root = shell.current?.closest<HTMLElement>(".clinic")
     if (!node || !root) return
     const fit = () => root.style.setProperty("--bar", `${Math.ceil(node.offsetHeight + node.offsetTop)}px`)
     fit()
@@ -273,7 +267,7 @@ export function Clinic({ onOpenBench }: { onOpenBench: () => void }) {
             onClick={(event) => {
               opener.current = event.currentTarget
               setPaletteOpen(true)
-            }} aria-keyshortcuts="Meta+K Control+K /">
+            }} aria-keyshortcuts="Meta+K Control+K">
             <MagnifyingGlass size={16} aria-hidden="true" />
             <span>Go to a patient or action</span>
             <kbd>{/Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K"}</kbd>

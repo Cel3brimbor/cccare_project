@@ -17,4 +17,4 @@ Metal has to be available. If it is not, training stays off.
 
 ## Keys
 
-Space starts and pauses. Period steps, when the focus is not in a text field.
+On the training bench, Space starts and pauses and Period steps while the network has focus. In the clinic, Cmd+K or Ctrl+K opens a palette to jump to any patient or action, and the arrow keys move through the patient list.

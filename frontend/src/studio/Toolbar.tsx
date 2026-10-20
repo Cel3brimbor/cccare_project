@@ -83,7 +83,7 @@ export function Toolbar({
             Clinic
           </button>
         ) : null}
-        <strong>Training bench</strong>
+        <h1>Training bench</h1>
         <span>{task === "digits" ? "Handwritten digits" : "IMDB reviews"}</span>
       </div>
       <Segmented
@@ -124,12 +124,10 @@ export function Toolbar({
               type="button"
               className="btn primary"
               disabled={blocked && !running}
-              aria-keyshortcuts="Space"
-              title={blocked && !running ? undefined : running ? "Pause (Space)" : "Train (Space)"}
+              title={blocked && !running ? undefined : running ? "Pause. Space also pauses while the network has focus." : "Train. Space also trains while the network has focus."}
               onClick={() => send({ type: running ? "pause" : "start" })}
             >
               {running ? "Pause" : "Train"}
-              <kbd aria-hidden="true">Space</kbd>
             </button>
           </span>
         )}
@@ -138,12 +136,10 @@ export function Toolbar({
             type="button"
             className="btn"
             disabled={blocked || running}
-            aria-keyshortcuts="Period"
-            title={blocked || running ? undefined : "One step (.)"}
+            title={blocked || running ? undefined : "One step. Period also steps while the network has focus."}
             onClick={() => send({ type: "step" })}
           >
             Step
-            <kbd aria-hidden="true">.</kbd>
           </button>
         </span>
         <span className="tip confirm-anchor" title={resetLocked ? reason : undefined}>

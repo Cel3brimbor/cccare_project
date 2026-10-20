@@ -52,8 +52,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      const tag = target?.tagName
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || target?.isContentEditable) return
+      if (!target?.closest(".network")) return
       if (event.key === " ") {
         event.preventDefault()
         send({ type: studio.status.phase === "running" ? "pause" : "start" })
@@ -87,6 +86,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
           />
           <ModelPopover open={modelOpen} onClose={() => setModelOpen(false)} />
         </div>
+        <h2 className="sr">Network</h2>
         <NetworkCanvas
           sizes={sizes}
           titles={titles}
@@ -103,6 +103,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
             <i className="swatch neg" aria-hidden="true" /> Negative weight
           </span>
         </div>
+        <h2 className="sr">Training curves</h2>
         <Charts />
         <ProbeSheet open={probeOpen} onClose={() => setProbeOpen(false)} />
       </main>

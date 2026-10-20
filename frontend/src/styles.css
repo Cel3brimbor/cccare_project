@@ -119,7 +119,9 @@ button:disabled { cursor: not-allowed; }
 .toolbar .meta { grid-column: 1 / -1; }
 .brand { display: flex; flex-direction: column; min-width: 0; }
 .brand span { white-space: nowrap; }
-.brand strong {
+.brand h1 { margin: 0; }
+.brand strong,
+.brand h1 {
   font-size: 1rem;
   letter-spacing: 0.12em;
   line-height: 1.1;
@@ -521,6 +523,7 @@ h3 {
 .popover:focus-visible, .sheet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 fieldset { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
 fieldset + fieldset { margin-top: 6px; }
+.popover fieldset:first-of-type { margin-top: 12px; }
 fieldset legend {
   margin: 0 0 8px;
   padding: 0;
@@ -817,7 +820,8 @@ fieldset:disabled { opacity: 0.55; }
   .btn kbd { display: none; }
 }
 @container stage (max-width: 560px) {
-  .vitals { display: none; }
+  .vitals { gap: 2px 10px; }
+  .actions .divider { display: none; }
   .actions { gap: 4px; }
   .btn { padding-inline: 10px; }
 }
@@ -827,8 +831,9 @@ fieldset:disabled { opacity: 0.55; }
   .legend { position: static; justify-self: center; margin: 4px auto 8px; padding: 4px 12px; }
   .chrome { position: relative; top: auto; left: auto; right: auto; margin: 8px 8px 0; }
   .inspector { border-left: 0; border-top: 1px solid var(--separator); }
-  .charts { grid-template-columns: 72px minmax(0, 1fr) minmax(120px, 0.8fr) minmax(0, 1fr); }
-  .charts .quiet { display: none; }
+  .charts { grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; }
+  .inspector .segments { flex-wrap: wrap; }
+  .inspector .segments button { flex: 1 0 auto; }
 }
 
 /* Liquid Glass: the floating controls layer */

@@ -33,6 +33,7 @@ export function Inspector({
   return (
     <aside className="inspector">
       <div className="inspector-head">
+        <h2 className="sr">Inspector</h2>
         <p className="inspector-label">Layer</p>
         <Segmented
           label="Layer"
@@ -758,7 +759,14 @@ function MatrixBlock({
   return (
     <figure className="matrix-block">
       <figcaption>{label}</figcaption>
-      <Heatmap matrix={matrix} selected={selected} cursor={cursor} mode={mode} onSelect={onSelect} />
+      <Heatmap
+        label={`${label}, ${matrix.length} by ${matrix[0].length}`}
+        matrix={matrix}
+        selected={selected}
+        cursor={cursor}
+        mode={mode}
+        onSelect={onSelect}
+      />
     </figure>
   )
 }
