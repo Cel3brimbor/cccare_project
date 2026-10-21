@@ -72,9 +72,16 @@ function activationAt(trace: Trace | null, layer: number, unit: number): number 
   if (!trace) return 0
   if (layer === 0) {
     if (trace.task === "digits") return trace.pixels[unit] ?? 0
+    if (trace.task === "gait") return trace.frame[unit] ?? 0
     return trace.pooled[unit] ?? 0
   }
   return trace.layers[layer - 1]?.output[unit] ?? 0
+}
+
+function traceMode(frameOn: boolean, imageOn: boolean): Trace["task"] {
+  if (frameOn) return "gait"
+  if (imageOn) return "digits"
+  return "reviews"
 }
 
 export function NetworkCanvas({
@@ -83,6 +90,7 @@ export function NetworkCanvas({
   selection,
   reducedMotion,
   imageSide,
+  frame,
   onSelect,
 }: {
   sizes: number[]
@@ -90,6 +98,7 @@ export function NetworkCanvas({
   selection: Selection
   reducedMotion: boolean
   imageSide: number | null
+  frame: { rows: number; cols: number } | null
   onSelect: (selection: Selection) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -100,12 +109,14 @@ export function NetworkCanvas({
   const sizesRef = useRef(sizes)
   const titlesRef = useRef(titles)
   const imageRef = useRef(imageSide)
+  const frameRef = useRef(frame)
   selectionRef.current = selection
   reducedRef.current = reducedMotion
   onSelectRef.current = onSelect
   sizesRef.current = sizes
   titlesRef.current = titles
   imageRef.current = imageSide
+  frameRef.current = frame
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -128,12 +139,30 @@ export function NetworkCanvas({
 
     let labelY = 112
     let grid = 0
+    let gridRows = 0
     let cell = 0
+    let cellH = 0
+    let signed = false
+    let mode: Trace["task"] = "reviews"
     const rebuild = () => {
       const rawTrace = latestTrace
       const layerSizes = sizesRef.current
       const side = imageRef.current
-      grid = side && layerSizes[0] === side * side ? side : 0
+      const sensor = frameRef.current
+      if (sensor && layerSizes[0] === sensor.rows * sensor.cols) {
+        grid = sensor.cols
+        gridRows = sensor.rows
+        signed = true
+      } else if (side && layerSizes[0] === side * side) {
+        grid = side
+        gridRows = side
+        signed = false
+      } else {
+        grid = 0
+        gridRows = 0
+        signed = false
+      }
+      mode = traceMode(signed, Boolean(grid) && !signed)
       const padX = grid ? 28 : 72
       const toolbar = document.querySelector(".toolbar")
       const top = wrap.getBoundingClientRect().top
@@ -142,22 +171,30 @@ export function NetworkCanvas({
       labelY = padY - 16
       const bottom = 36
       const availH = Math.max(80, height - padY - bottom)
-      cell = grid ? Math.max(3, Math.min(12, availH / grid, ((width - 56) * 0.36) / grid)) : 0
+      if (grid) {
+        const maxW = (width - 56) * (signed ? 0.42 : 0.36)
+        cell = Math.max(signed ? 1.4 : 3, Math.min(signed ? 7 : 12, maxW / grid))
+        cellH = signed ? Math.max(4, Math.min(16, availH / Math.max(gridRows, 1))) : cell
+      } else {
+        cell = 0
+        cellH = 0
+      }
       const gridSize = grid * cell
+      const gridHeight = gridRows * cellH
       const contentLeft = grid ? padX + gridSize + 48 : padX
-      const contentRight = width - (grid ? 56 : padX)
+      const contentRight = width - (signed ? 84 : grid ? 56 : padX)
       const laterLayers = grid ? Math.max(1, layerSizes.length - 1) : layerSizes.length
       nodes = []
       const anchors: Node[][] = []
       layerSizes.forEach((count, layer) => {
         if (grid && layer === 0) {
           const originX = padX
-          const originY = padY + (availH - gridSize) / 2
+          const originY = padY + (availH - gridHeight) / 2
           const column: Node[] = []
           for (let unit = 0; unit < count; unit += 1) {
             const node = {
               x: originX + ((unit % grid) + 0.5) * cell,
-              y: originY + (Math.floor(unit / grid) + 0.5) * cell,
+              y: originY + (Math.floor(unit / grid) + 0.5) * cellH,
               layer,
               unit,
             }
@@ -183,7 +220,7 @@ export function NetworkCanvas({
       })
       buckets = []
       edges = []
-      const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
+      const trace = rawTrace && rawTrace.task === mode ? rawTrace : null
       if (!trace) return
       const positive = cssColor("--pos", "#b86a2e")
       const negative = cssColor("--neg", "#3d6fbf")
@@ -228,7 +265,7 @@ export function NetworkCanvas({
               .map((source) => ({ source, value: at(source.unit, dest.unit) }))
               .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
             const inked = fromImage
-              ? ranked.filter((entry) => Math.abs(activationAt(trace, entry.source.layer, entry.source.unit)) > 0.08)
+              ? ranked.filter((entry) => Math.abs(activationAt(trace, entry.source.layer, entry.source.unit)) > (signed ? 0.35 : 0.08))
               : ranked
             const chosen = (inked.length ? inked : ranked).slice(0, fromImage ? 3 : TOP_K)
             chosen.forEach((entry) => add(entry.source, dest, entry.value))
@@ -288,7 +325,8 @@ export function NetworkCanvas({
         height = nextH
       }
       const rawTrace = latestTrace
-      const key = `${sizesRef.current.join(",")}@${imageRef.current ?? 0}`
+      const sensor = frameRef.current
+      const key = `${sizesRef.current.join(",")}@${imageRef.current ?? 0}@${sensor ? `${sensor.rows}x${sensor.cols}` : 0}`
       if (traceSeq !== (rawTrace?.seq ?? 0) || key !== sizeKey || themeSeen !== themeVersion) {
         themeSeen = themeVersion
         traceSeq = rawTrace?.seq ?? 0
@@ -327,9 +365,9 @@ export function NetworkCanvas({
         if (origin) {
           const left = origin.x - cell / 2
           const top = origin.y - cell / 2
-          context.fillStyle = "#0e110b"
+          context.fillStyle = signed ? cssColor("--stage", "#111113") : "#0e110b"
           context.beginPath()
-          context.roundRect(left - 8, top - 8, grid * cell + 16, grid * cell + 16, 2)
+          context.roundRect(left - 8, top - 8, grid * cell + 16, gridRows * cellH + 16, 2)
           context.fill()
         }
       }
@@ -358,7 +396,7 @@ export function NetworkCanvas({
         })
       }
       context.globalAlpha = 1
-      const trace = rawTrace && ((grid && rawTrace.task === "digits") || (!grid && rawTrace.task !== "digits")) ? rawTrace : null
+      const trace = rawTrace && rawTrace.task === mode ? rawTrace : null
       const accent = parseColor(cssColor("--accent", "#0a84ff"))
       const idle = parseColor(cssColor("--node", "#3a3a3c"))
       const ink = cssColor("--secondary", "#a1a1a6")
@@ -379,16 +417,26 @@ export function NetworkCanvas({
         const hot = selected.layer === node.layer && selected.unit === node.unit
         const over = hover.layer === node.layer && hover.unit === node.unit
         if (grid && node.layer === 0) {
-          const ink = Math.max(0, Math.min(1, value))
           const gap = cell >= 6 ? 1 : 0
           const size = Math.max(1, cell - gap)
-          context.fillStyle = mix([16, 16, 18], [245, 245, 247], ink)
-          context.fillRect(node.x - cell / 2, node.y - cell / 2, size, size)
+          const tall = Math.max(1, cellH - (cellH >= 6 ? 1 : 0))
+          if (signed) {
+            const scale = layerStats.get(0)?.scale ?? 1
+            const amount = Math.min(1, Math.abs(value) / scale)
+            const positive = parseColor(cssColor("--pos", "#b86a2e"))
+            const negative = parseColor(cssColor("--neg", "#3d6fbf"))
+            const paper = parseColor(cssColor("--stage", "#111113"))
+            context.fillStyle = mix(paper, value >= 0 ? positive : negative, amount)
+          } else {
+            const inkAmount = Math.max(0, Math.min(1, value))
+            context.fillStyle = mix([16, 16, 18], [245, 245, 247], inkAmount)
+          }
+          context.fillRect(node.x - cell / 2, node.y - cellH / 2, size, tall)
           if (hot || over) {
             context.strokeStyle = text
             context.globalAlpha = hot ? 0.95 : 0.45
             context.lineWidth = 1
-            context.strokeRect(node.x - cell / 2 + 0.5, node.y - cell / 2 + 0.5, size - 1, size - 1)
+            context.strokeRect(node.x - cell / 2 + 0.5, node.y - cellH / 2 + 0.5, size - 1, tall - 1)
             context.globalAlpha = 1
           }
           return
@@ -402,12 +450,14 @@ export function NetworkCanvas({
         context.fillStyle = mix(idle, accent, Math.min(1, Math.abs(value) / scale))
         context.arc(node.x, node.y, radius, 0, Math.PI * 2)
         context.fill()
-        if (grid && node.layer === sizesRef.current.length - 1) {
+        const lastLayer = node.layer === sizesRef.current.length - 1
+        if (lastLayer && (grid || trace?.task === "gait")) {
+          const mark = trace?.task === "gait" ? (trace.activityShort[node.unit] ?? String(node.unit)) : String(node.unit)
           context.fillStyle = text
           context.font = CANVAS_MONO
           context.textAlign = "left"
           context.textBaseline = "middle"
-          context.fillText(String(node.unit), node.x + radius + 6, node.y)
+          context.fillText(mark, node.x + radius + 6, node.y)
           context.textAlign = "center"
           context.textBaseline = "alphabetic"
         }
@@ -454,7 +504,7 @@ export function NetworkCanvas({
       context.textAlign = "left"
       context.font = CANVAS_MONO
       context.fillStyle = ink
-      const noun = trace?.task === "digits" ? "digit" : "review"
+      const noun = trace?.task === "digits" ? "digit" : trace?.task === "gait" ? "window" : "review"
       const caption = !trace
         ? "Weights appear with the first step"
         : trace.kind === "probe"
@@ -467,9 +517,14 @@ export function NetworkCanvas({
         const node = nodes.find((item) => item.layer === hover.layer && item.unit === hover.unit)
         if (node) {
           const value = activationAt(trace, node.layer, node.unit)
+          const gait = trace?.task === "gait" ? trace : null
           const label =
-            grid && node.layer === 0
+            grid && node.layer === 0 && gait
+              ? `${gait.channels[Math.floor(node.unit / grid)] ?? "Sensor"} · sample ${(node.unit % grid) + 1} · ${value.toFixed(2)}`
+              : grid && node.layer === 0
               ? `Pixel ${Math.floor(node.unit / grid) + 1}, ${(node.unit % grid) + 1} · ${value.toFixed(2)}`
+              : node.layer === sizesRef.current.length - 1 && gait
+                ? `${gait.activityNames[node.unit] ?? "Activity"} · ${value.toFixed(3)}`
               : grid && node.layer === sizesRef.current.length - 1
                 ? `Digit ${node.unit} · ${value.toFixed(3)}`
                 : `${titlesRef.current[node.layer] ?? "Unit"} ${node.unit + 1} · ${value.toFixed(3)}`
@@ -547,7 +602,7 @@ export function NetworkCanvas({
     if (layer !== selection.layer || unit !== selection.unit) onSelect({ layer, unit })
   }
 
-  const spoken = describeSelection(titles, sizes, selection, imageSide)
+  const spoken = describeSelection(titles, sizes, selection, imageSide, frame)
 
   return (
     <div ref={wrapRef} className="canvas-wrap">
@@ -566,14 +621,26 @@ export function NetworkCanvas({
   )
 }
 
-function describeSelection(titles: string[], sizes: number[], selection: Selection, imageSide: number | null) {
+function describeSelection(
+  titles: string[],
+  sizes: number[],
+  selection: Selection,
+  imageSide: number | null,
+  frame: { rows: number; cols: number } | null,
+) {
   const title = titles[selection.layer] ?? "Unit"
   const last = sizes.length > 0 && selection.layer === sizes.length - 1
+  if (frame && selection.layer === 0) {
+    const row = Math.floor(selection.unit / frame.cols) + 1
+    const col = (selection.unit % frame.cols) + 1
+    return `Sensor row ${row}, sample ${col}`
+  }
   if (imageSide && selection.layer === 0) {
     const row = Math.floor(selection.unit / imageSide) + 1
     const col = (selection.unit % imageSide) + 1
     return `Pixel row ${row}, column ${col}`
   }
+  if (frame && last) return `Activity ${selection.unit + 1}`
   if (imageSide && last) return `Digit ${selection.unit}`
   return `${title} ${selection.unit + 1}`
 }

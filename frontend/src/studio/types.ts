@@ -1,4 +1,4 @@
-export type TaskName = "reviews" | "digits"
+export type TaskName = "gait" | "reviews" | "digits"
 
 export type Config = {
   embedDim: number
@@ -12,6 +12,11 @@ export type Config = {
   eps: number
   weightDecay: number
   seed: number
+  widths?: number[]
+  titles?: string[]
+  frameRows?: number
+  frameCols?: number
+  parameters?: number
 }
 
 export type DeviceInfo = {
@@ -70,7 +75,27 @@ export type DigitDataset = {
   counts: number[]
 }
 
-export type DatasetInfo = ReviewDataset | DigitDataset
+export type GaitChannel = { name: string; kind: "accel" | "muscle" }
+
+export type GaitActivity = { name: string; short: string; count: number }
+
+export type GaitDataset = {
+  type: "dataset"
+  task: "gait"
+  name: string
+  train: number
+  test: number
+  window: number
+  stride: number
+  rate: number
+  seconds: number
+  channels: GaitChannel[]
+  activities: GaitActivity[]
+  trainPeople: number[]
+  testPeople: number[]
+}
+
+export type DatasetInfo = GaitDataset | ReviewDataset | DigitDataset
 
 export type HistoryPoint = {
   step: number
@@ -94,14 +119,22 @@ export type Metrics = {
   history: HistoryPoint[]
 }
 
+export type PackedFloats = { dtype: "f32"; shape: number[]; data: string }
+
 export type AffineLayer = {
   name: string
   title: string
-  activation: "relu" | "logit" | "softmax"
+  activation: "relu" | "logit" | "softmax" | "conv"
+  detail?: string
   input: number[]
   weight: number[][]
   rowIndex?: number[]
   colIndex?: number[]
+  frameCols?: number
+  taps?: number
+  temporal?: number[][]
+  kernel?: number[][][]
+  kernelIndex?: number[]
   bias: number[]
   pre: number[]
   output: number[]
@@ -169,7 +202,21 @@ export type DigitTrace = TraceCore & {
   probs: number[]
 }
 
-export type Trace = ReviewTrace | DigitTrace
+export type GaitTrace = TraceCore & {
+  task: "gait"
+  channels: string[]
+  frame: number[]
+  width: number
+  height: number
+  activityNames: string[]
+  activityShort: string[]
+  logits: number[]
+  probs: number[]
+  person: number | null
+  index: number | null
+}
+
+export type Trace = GaitTrace | ReviewTrace | DigitTrace
 
 export type Prediction = {
   type: "predict"
@@ -180,6 +227,11 @@ export type Prediction = {
   logit: number
   pred: number
   probs?: number[]
+  index?: number
+  total?: number
+  label?: number
+  activity?: string
+  labelName?: string
   untrained: boolean
   truncated: boolean
   tokens: string[]
@@ -191,6 +243,7 @@ export type ServerMessage =
   | Status
   | DatasetInfo
   | Metrics
+  | { type: "catalog"; tasks: TaskName[]; task: TaskName }
   | { type: "config"; config: Config; task?: TaskName }
   | { type: "trace"; trace: Trace | null }
   | Prediction
@@ -199,6 +252,7 @@ export type ServerMessage =
 export type Studio = {
   connected: boolean
   task: TaskName
+  tasks: TaskName[]
   device: DeviceInfo | null
   system: SystemInfo | null
   status: Status
@@ -214,14 +268,18 @@ export type Selection = { layer: number; unit: number }
 
 export const defaultConfig: Config = {
   embedDim: 48,
-  hidden: [64, 32],
+  hidden: [128],
   lr: 0.001,
-  batchSize: 64,
-  epochs: 3,
+  batchSize: 256,
+  epochs: 4,
   optimizer: "adam",
   beta1: 0.9,
   beta2: 0.999,
   eps: 1e-8,
-  weightDecay: 0,
+  weightDecay: 0.01,
   seed: 0,
+  widths: [2560, 768, 1024, 1280, 128, 10],
+  titles: ["Sensors", "Stem", "Mid", "Deep", "Head", "Activity"],
+  frameRows: 20,
+  frameCols: 128,
 }

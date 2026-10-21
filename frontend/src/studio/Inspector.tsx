@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Formula } from "./Formula"
+import { ConvBackward, ConvForward, ConvWeights, GaitData, SensorsForward } from "./GaitLesson"
 import { Heatmap } from "./Heatmap"
 import { columnForUnit, dotPrefix, exampleBackward, meanPrefix } from "./linalg"
 import { formatCompact, formatNum, imageSide, layerTitles } from "./format"
@@ -22,9 +23,15 @@ export function Inspector({
   const studio = useStudio()
   const [tab, setTab] = useState<Tab>("Forward")
   const digits = studio.task === "digits"
+  const gait = studio.task === "gait"
   const side = studio.dataset?.task === "digits" ? studio.dataset.width : 28
-  const titles = layerTitles(studio.config.hidden.length, studio.task)
-  const widths = digits ? [side * side, ...studio.config.hidden, 10] : [studio.config.embedDim, ...studio.config.hidden, 1]
+  const titles = gait && studio.config.titles?.length ? studio.config.titles : layerTitles(studio.config.hidden.length, studio.task)
+  const widths =
+    gait && studio.config.widths?.length
+      ? studio.config.widths
+      : digits
+        ? [side * side, ...studio.config.hidden, 10]
+        : [studio.config.embedDim, ...studio.config.hidden, 1]
   const layer = Math.min(selection.layer, titles.length - 1)
   const unit = Math.min(selection.unit, Math.max(0, widths[layer] - 1))
   const trace = studio.trace && studio.trace.task === studio.task ? studio.trace : null
@@ -54,14 +61,14 @@ export function Inspector({
       </div>
       <div className="inspector-body" id="lesson-panel" role="tabpanel" aria-labelledby={segmentTabId("lesson", tab)}>
         {tab === "Forward" && (
-          <Forward trace={trace} layer={layer} unit={unit} affine={affine} widths={widths} digits={digits} onSelect={onSelect} />
+          <Forward trace={trace} layer={layer} unit={unit} affine={affine} widths={widths} digits={digits} gait={gait} onSelect={onSelect} />
         )}
-        {tab === "Weights" && <Weights trace={trace} layer={layer} unit={unit} affine={affine} digits={digits} onSelect={onSelect} />}
+        {tab === "Weights" && <Weights trace={trace} layer={layer} unit={unit} affine={affine} digits={digits} gait={gait} onSelect={onSelect} />}
         {tab === "Backward" && (
-          <Backward trace={trace} layer={layer} unit={unit} affine={affine} digits={digits} trainedSteps={studio.status.trainedSteps} onSelect={onSelect} />
+          <Backward trace={trace} layer={layer} unit={unit} affine={affine} digits={digits} gait={gait} trainedSteps={studio.status.trainedSteps} onSelect={onSelect} />
         )}
         {tab === "Update" && (
-          <Update trace={trace} layer={layer} affine={affine} digits={digits} trainedSteps={studio.status.trainedSteps} />
+          <Update trace={trace} layer={layer} affine={affine} digits={digits} gait={gait} trainedSteps={studio.status.trainedSteps} />
         )}
         {tab === "Data" && <Data onEval={() => send({ type: "eval" })} evaluating={studio.status.phase === "evaluating"} />}
       </div>
@@ -76,6 +83,7 @@ function Forward({
   affine,
   widths,
   digits,
+  gait,
   onSelect,
 }: {
   trace: Trace | null
@@ -84,15 +92,18 @@ function Forward({
   affine: AffineLayer | undefined
   widths: number[]
   digits: boolean
+  gait: boolean
   onSelect: (selection: Selection) => void
 }) {
   if (layer === 0) {
     if (digits) return <PixelsForward trace={trace} unit={unit} onSelect={onSelect} />
+    if (gait) return <SensorsForward trace={trace?.task === "gait" ? trace : null} unit={unit} onSelect={onSelect} />
     return <PoolForward trace={trace?.task === "reviews" ? trace : null} unit={unit} width={widths[0]} onSelect={onSelect} />
   }
+  if (gait && affine?.activation === "conv") return <ConvForward affine={affine} unit={unit} />
   const input = affine?.input.length ?? widths[layer - 1]
   const output = affine?.output.length ?? widths[layer]
-  const activation = affine?.activation ?? (layer === widths.length - 1 ? (digits ? "softmax" : "logit") : "relu")
+  const activation = affine?.activation ?? (layer === widths.length - 1 ? (digits || gait ? "softmax" : "logit") : "relu")
   return (
     <section>
       <Formula tex={`z = hW + b`} />
@@ -106,7 +117,11 @@ function Forward({
         <>
           <Formula tex={`p_k = \\frac{e^{z_k}}{\\sum_j e^{z_j}}`} />
           <Formula tex={`L = -\\log p_y`} />
-          <p className="lesson">Ten logits become a probability over the digits. The loss is the negative log of the true digit’s probability.</p>
+          <p className="lesson">
+            {gait
+              ? "The logits become a probability over the activities. The loss is the negative log of the recorded activity."
+              : "Ten logits become a probability over the digits. The loss is the negative log of the true digit’s probability."}
+          </p>
         </>
       ) : (
         <>
@@ -118,7 +133,13 @@ function Forward({
       {affine ? (
         <AffineProduct affine={affine} unit={unit} onSelect={(next) => onSelect({ layer, unit: next })} />
       ) : (
-        <p className="lesson">{digits ? "Train or step once to fill these matrices with a real digit." : "Train or step once to fill these matrices with a real review."}</p>
+        <p className="lesson">
+          {gait
+            ? "Train or step once to fill these matrices with a real window."
+            : digits
+              ? "Train or step once to fill these matrices with a real digit."
+              : "Train or step once to fill these matrices with a real review."}
+        </p>
       )}
     </section>
   )
@@ -224,7 +245,9 @@ function AffineProduct({
   const cursor = k > 0 ? Math.min(k, length) - 1 : null
   return (
     <>
-      {weights && side ? (
+      {weights && length > 160 && !side ? (
+        <p className="fine">h has {length.toLocaleString()} values. The sum below uses every one of them.</p>
+      ) : weights && side ? (
         <>
           <figure className="matrix-block">
             <figcaption>h, the pixels</figcaption>
@@ -289,6 +312,7 @@ function Weights({
   unit,
   affine,
   digits,
+  gait,
   onSelect,
 }: {
   trace: Trace | null
@@ -296,9 +320,12 @@ function Weights({
   unit: number
   affine: AffineLayer | undefined
   digits: boolean
+  gait: boolean
   onSelect: (selection: Selection) => void
 }) {
+  if (affine?.activation === "conv") return <ConvWeights affine={affine} unit={unit} />
   if (layer === 0) {
+    if (gait) return <SensorsForward trace={trace?.task === "gait" ? trace : null} unit={unit} onSelect={onSelect} />
     if (digits) {
       return (
         <section>
@@ -397,6 +424,7 @@ function Backward({
   unit,
   affine,
   digits,
+  gait,
   trainedSteps,
   onSelect,
 }: {
@@ -405,16 +433,25 @@ function Backward({
   unit: number
   affine: AffineLayer | undefined
   digits: boolean
+  gait: boolean
   trainedSteps: number
   onSelect: (selection: Selection) => void
 }) {
+  if (affine?.activation === "conv") return <ConvBackward affine={affine} trainedSteps={trainedSteps} />
   const grads = trace ? exampleBackward(trace) : null
-  const noun = digits ? "digit" : "review"
+  const noun = gait ? "window" : digits ? "digit" : "review"
   if (!trace) return <p className="lesson">A backward pass needs a labeled {noun} from a training step.</p>
   if (!grads) {
     return <p className="lesson">A probe has no label, so there is no loss to differentiate. Step the trainer to see a backward pass.</p>
   }
   if (layer === 0) {
+    if (gait) {
+      return (
+        <section>
+          <p className="lesson">The sensors are measurements. The loss reaches them through the stem filters, on the next layer.</p>
+        </section>
+      )
+    }
     const incoming = grads[0]?.dInput ?? []
     if (trace.task === "digits") {
       return (
@@ -432,6 +469,7 @@ function Backward({
         </section>
       )
     }
+    if (trace.task !== "reviews") return null
     const share = incoming.map((value) => value / Math.max(1, trace.gathered.length))
     return (
       <section>
@@ -502,20 +540,26 @@ function Update({
   layer,
   affine,
   digits,
+  gait,
   trainedSteps,
 }: {
   trace: Trace | null
   layer: number
   affine: AffineLayer | undefined
   digits: boolean
+  gait: boolean
   trainedSteps: number
 }) {
   const { config } = useStudio()
   const optimizer = trace?.optimizer
-  if (digits && layer === 0) {
+  if ((digits || gait) && layer === 0) {
     return (
       <section>
-        <p className="lesson">Pixels are data, not parameters. The learning step is on the layers to the right.</p>
+        <p className="lesson">
+          {gait
+            ? "Sensor values are measurements, not parameters. The learning step starts at the stem."
+            : "Pixels are data, not parameters. The learning step is on the layers to the right."}
+        </p>
       </section>
     )
   }
@@ -684,6 +728,7 @@ function RowBrowser() {
 function Data({ onEval, evaluating }: { onEval: () => void; evaluating: boolean }) {
   const { dataset, trace, metrics, task } = useStudio()
   const view = trace && trace.task === task ? trace : null
+  if (task === "gait") return <GaitData onEval={onEval} evaluating={evaluating} />
   if (task === "digits") return <DigitData dataset={dataset?.task === "digits" ? dataset : null} trace={view?.task === "digits" ? view : null} metrics={metrics} onEval={onEval} evaluating={evaluating} />
   return (
     <section>

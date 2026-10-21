@@ -316,6 +316,7 @@ button:disabled { cursor: not-allowed; }
   background: color-mix(in srgb, var(--stage) 88%, transparent);
 }
 .legend span { display: flex; align-items: center; gap: 6px; }
+.stage.gait .legend { right: auto; left: 18px; }
 .swatch { width: 14px; height: 2px; border-radius: 2px; display: block; }
 .swatch.pos { background: var(--pos); }
 .swatch.neg { background: var(--neg); }
@@ -604,6 +605,53 @@ fieldset:disabled { opacity: 0.55; }
   will-change: transform;
 }
 .sheet.digits { height: min(420px, 58%); }
+.sheet.gait { height: min(680px, 82%); }
+.gait-probe {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 16px;
+}
+.activity-list {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.activity-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(72px, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+  min-height: 28px;
+}
+.activity-list i {
+  display: block;
+  height: 6px;
+  background: var(--fill-strong);
+}
+.activity-list b {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.activity-list .is-pred b { background: var(--pos); }
+.activity-list .is-label span:first-child,
+.activity-list .is-pred span:first-child { font-weight: 650; }
+.channel-key {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.channel-key li { display: flex; align-items: center; gap: 6px; color: var(--secondary); font-size: 0.75rem; }
+.channel-key i { width: 8px; height: 8px; background: var(--accent); }
+.channel-key i.is-muscle { background: var(--pos); }
+.sensor-frame { display: block; max-width: 100%; border-radius: 2px; }
 .sheet .transcript:has(.exchange) { min-height: 120px; }
 .sheet[data-open="false"] {
   visibility: hidden;
@@ -746,6 +794,8 @@ fieldset:disabled { opacity: 0.55; }
 .class-bars div { display: flex; flex-direction: column; justify-content: end; align-items: center; height: 100%; gap: 4px; }
 .class-bars i { display: block; width: 100%; background: var(--accent); border-radius: 0; opacity: 0.8; }
 .class-bars small { color: var(--secondary); font-size: 0.7rem; }
+.class-bars.gait { grid-template-columns: repeat(10, minmax(0, 1fr)); height: 96px; }
+.class-bars.gait small { font-size: 0.62rem; text-align: center; }
 .digit-row { display: flex; align-items: center; gap: 12px; }
 
 .loading {

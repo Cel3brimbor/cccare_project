@@ -29,25 +29,36 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
   const [modelOpen, setModelOpen] = useState(false)
   const [probeOpen, setProbeOpen] = useState(false)
   const digits = studio.task === "digits"
+  const gait = studio.task === "gait"
   const side = studio.dataset?.task === "digits" ? studio.dataset.width : 28
+  const frame =
+    gait && studio.config.frameRows && studio.config.frameCols
+      ? { rows: studio.config.frameRows, cols: studio.config.frameCols }
+      : null
   const titles = useMemo(
-    () => layerTitles(studio.config.hidden.length, studio.task),
-    [studio.config.hidden.length, studio.task],
+    () => (gait && studio.config.titles?.length ? studio.config.titles : layerTitles(studio.config.hidden.length, studio.task)),
+    [gait, studio.config.hidden.length, studio.config.titles, studio.task],
   )
-  const sizes = useMemo(
-    () => (digits ? [side * side, ...studio.config.hidden, 10] : [studio.config.embedDim, ...studio.config.hidden, 1]),
-    [digits, side, studio.config],
-  )
+  const sizes = useMemo(() => {
+    if (gait && studio.config.widths?.length) return studio.config.widths
+    if (digits) return [side * side, ...studio.config.hidden, 10]
+    return [studio.config.embedDim, ...studio.config.hidden, 1]
+  }, [digits, gait, side, studio.config])
 
   useEffect(() => {
-    const widths = digits ? [side * side, ...studio.config.hidden, 10] : [studio.config.embedDim, ...studio.config.hidden, 1]
+    const widths =
+      gait && studio.config.widths?.length
+        ? studio.config.widths
+        : digits
+          ? [side * side, ...studio.config.hidden, 10]
+          : [studio.config.embedDim, ...studio.config.hidden, 1]
     setSelection((current) => {
       const layer = Math.min(current.layer, widths.length - 1)
       const unit = Math.min(current.unit, widths[layer] - 1)
       if (layer === current.layer && unit === current.unit) return current
       return { layer, unit }
     })
-  }, [studio.config, digits, side])
+  }, [studio.config, digits, gait, side])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -69,7 +80,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
       <div className="sr" aria-live="polite">
         {studio.status.message}
       </div>
-      <main className="stage">
+      <main className={gait ? "stage gait" : "stage"}>
         <div className="chrome">
           <Toolbar
             modelOpen={modelOpen}
@@ -93,6 +104,7 @@ export default function Studio({ onReturn }: { onReturn: () => void }) {
           selection={selection}
           reducedMotion={reduced}
           imageSide={digits ? side : null}
+          frame={frame}
           onSelect={setSelection}
         />
         <div className="legend">

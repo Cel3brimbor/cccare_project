@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEv
 import { animate, motion, useMotionValue, type AnimationPlaybackControls } from "motion/react"
 import { useDialog } from "./dialog"
 import { DigitPad } from "./DigitPad"
+import { GaitProbe } from "./GaitProbe"
 import { formatNum } from "./format"
 import { usePrefers } from "./media"
 import { send, useStudio } from "./store"
@@ -120,7 +121,7 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
     <motion.div
       ref={sheetRef}
       id="probe-sheet"
-      className={task === "digits" ? "sheet digits" : "sheet"}
+      className={task === "digits" ? "sheet digits" : task === "gait" ? "sheet gait" : "sheet"}
       style={{ y }}
       data-open={open ? "true" : "false"}
       role="dialog"
@@ -135,8 +136,9 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
       </div>
       <div className="sheet-head">
         <div>
-          <h2 id={titleId}>{task === "digits" ? "Draw a digit" : "Try a review"}</h2>
+          <h2 id={titleId}>{task === "digits" ? "Draw a digit" : task === "gait" ? "Try a window" : "Try a review"}</h2>
           {task === "digits" ? <p>Paint the grid. The reply is the digit with the highest probability.</p> : null}
+          {task === "gait" ? <p>A held-out person. Rows are the leg sensors. Time runs left to right.</p> : null}
         </div>
         <button
           type="button"
@@ -154,6 +156,8 @@ export function ProbeSheet({ open, onClose }: { open: boolean; onClose: () => vo
       </div>
       {task === "digits" ? (
         <DigitPad ready={ready} />
+      ) : task === "gait" ? (
+        <GaitProbe ready={ready} open={open} />
       ) : (
       <>
       <div className="transcript">

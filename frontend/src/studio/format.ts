@@ -32,11 +32,15 @@ export function formatPct(value: number | null | undefined): string {
   return `${Math.round(value)}%`
 }
 
-export function layerTitles(hiddenCount: number, task: "reviews" | "digits" = "reviews"): string[] {
+export function layerTitles(hiddenCount: number, task: "gait" | "reviews" | "digits" = "gait"): string[] {
   const hidden = Array.from({ length: hiddenCount }, (_, index) =>
     hiddenCount === 1 ? "Hidden" : `Hidden ${index + 1}`,
   )
   if (task === "digits") return ["Pixels", ...hidden, "Digits"]
+  if (task === "gait") {
+    const head = hiddenCount === 1 ? ["Head"] : hidden.map((_, index) => `Head ${index + 1}`)
+    return ["Sensors", "Stem", "Mid", "Deep", ...head, "Activity"]
+  }
   return ["Pool", ...hidden, "Logit"]
 }
 

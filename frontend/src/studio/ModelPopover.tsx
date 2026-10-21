@@ -33,8 +33,16 @@ export function ModelPopover({ open, onClose }: { open: boolean; onClose: () => 
   if (!open) return null
   const vocab = dataset?.task === "reviews" ? dataset.vocab : 12000
   const side = dataset?.task === "digits" ? dataset.width : 28
+  const gait = task === "gait"
   const commit = (patch: Partial<Config>) => send({ type: "configure", config: patch })
-  const parameters = task === "digits" ? networkParameters(side * side, config.hidden, 10) : parameterCount(config.embedDim, config.hidden, vocab)
+  const parameters =
+    gait && config.parameters
+      ? config.parameters
+      : task === "digits"
+        ? networkParameters(side * side, config.hidden, 10)
+        : gait
+          ? networkParameters(1280, config.hidden, 10)
+          : parameterCount(config.embedDim, config.hidden, vocab)
 
   return (
     <div
@@ -69,12 +77,12 @@ export function ModelPopover({ open, onClose }: { open: boolean; onClose: () => 
           />
         )}
         <div className="field">
-          <span>Hidden widths</span>
+          <span>{gait ? "Head widths" : "Hidden widths"}</span>
           <div className="inline-fields">
             {config.hidden.map((width, index) => (
               <span key={index} className="hidden-row">
                 <label className="field">
-                  <span>{`Hidden ${index + 1}`}</span>
+                  <span>{gait ? (config.hidden.length === 1 ? "Head" : `Head ${index + 1}`) : `Hidden ${index + 1}`}</span>
                   <select
                     value={width}
                     onChange={(event) => {
@@ -101,7 +109,7 @@ export function ModelPopover({ open, onClose }: { open: boolean; onClose: () => 
                 )}
               </span>
             ))}
-            {config.hidden.length < 3 && (
+            {config.hidden.length < (gait ? 2 : 3) && (
               <button type="button" className="text-button" onClick={() => commit({ hidden: [...config.hidden, 16] })}>
                 Add layer
               </button>
@@ -140,7 +148,7 @@ export function ModelPopover({ open, onClose }: { open: boolean; onClose: () => 
           label="Batch size"
           value={config.batchSize}
           min={8}
-          max={256}
+          max={gait ? 768 : 256}
           step={8}
           onCommit={(batchSize) => commit({ batchSize })}
         />
@@ -196,9 +204,11 @@ export function ModelPopover({ open, onClose }: { open: boolean; onClose: () => 
       <p className="fine">Training settings apply on the next step. Switching optimizer clears its moments.</p>
       <p className="fine">
         {parameters.toLocaleString()} parameters.{" "}
-        {task === "digits"
-          ? `The input is a ${side}×${side} image, flattened. The last layer is 10 digits.`
-          : `Most of them are the ${vocab.toLocaleString()} × ${config.embedDim} embedding table, a row lookup. The canvas draws the pool and the layers you can still read cell by cell.`}
+        {gait
+          ? "Almost all of them sit in the convolutional trunk: stem 768, mid 1024, deep 1280, two residual blocks in each stage. That trunk is what fills the GPU. The head is the dense layer this panel can still multiply one column at a time."
+          : task === "digits"
+            ? `The input is a ${side}×${side} image, flattened. The last layer is 10 digits.`
+            : `Most of them are the ${vocab.toLocaleString()} × ${config.embedDim} embedding table, a row lookup. The canvas draws the pool and the layers you can still read cell by cell.`}
       </p>
     </div>
   )

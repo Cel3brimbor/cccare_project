@@ -5,6 +5,24 @@ import { Segmented } from "./Segmented"
 import { clearError, send, useStudio } from "./store"
 import type { TaskName } from "./types"
 
+const TASK_TITLES: Record<TaskName, string> = {
+  gait: "Leg sensors",
+  reviews: "IMDB reviews",
+  digits: "Handwritten digits",
+}
+
+const TASK_SWITCH: Record<TaskName, string> = {
+  gait: "Legs",
+  reviews: "Reviews",
+  digits: "Digits",
+}
+
+const PROBE_LABELS: Record<TaskName, string> = {
+  gait: "Try a window",
+  reviews: "Try a review",
+  digits: "Draw a digit",
+}
+
 export function Toolbar({
   modelOpen,
   probeOpen,
@@ -18,7 +36,7 @@ export function Toolbar({
   onOpenProbe: () => void
   onReturn?: () => void
 }) {
-  const { device, system, status, metrics, connected, error, task } = useStudio()
+  const { device, system, status, metrics, connected, error, task, tasks } = useStudio()
   const [armed, setArmed] = useState(false)
   const [machine, setMachine] = useState(false)
   const confirmRef = useRef<HTMLButtonElement>(null)
@@ -27,6 +45,10 @@ export function Toolbar({
   const reason = blockReason(connected, status.metal, status.phase)
   const busy = status.phase === "preparing" || status.phase === "evaluating"
   const showProgress = status.progress != null || busy
+  const epochPct =
+    running && status.progress != null
+      ? Math.round(Math.max(0, Math.min(1, status.progress)) * 100)
+      : null
 
   useEffect(() => {
     if (!error) return
@@ -85,20 +107,19 @@ export function Toolbar({
           </button>
         ) : null}
         <h1>Training bench</h1>
-        <span>{task === "digits" ? "Handwritten digits" : "IMDB reviews"}</span>
+        <span>{TASK_TITLES[task]}</span>
       </div>
-      <Segmented
-        className="segments task-switch"
-        label="Dataset"
-        value={task}
-        disabled={taskLocked}
-        hint={taskLocked ? reason : undefined}
-        options={[
-          { id: "reviews", label: "Reviews" },
-          { id: "digits", label: "Digits" },
-        ]}
-        onChange={(id) => send({ type: "task", task: id as TaskName })}
-      />
+      {tasks.length > 1 ? (
+        <Segmented
+          className="segments task-switch"
+          label="Dataset"
+          value={task}
+          disabled={taskLocked}
+          hint={taskLocked ? reason : undefined}
+          options={tasks.map((id) => ({ id, label: TASK_SWITCH[id] }))}
+          onChange={(id) => send({ type: "task", task: id as TaskName })}
+        />
+      ) : null}
       <p className={status.phase === "error" ? "status-line is-error" : "status-line"} title={status.message}>
         {status.message}
       </p>
@@ -194,7 +215,7 @@ export function Toolbar({
             aria-controls="probe-sheet"
             aria-haspopup="dialog"
           >
-            {task === "digits" ? "Draw a digit" : "Try a review"}
+            {PROBE_LABELS[task]}
           </button>
         </span>
       </div>
@@ -231,6 +252,7 @@ export function Toolbar({
         </p>
         <p className="epoch">
           {metrics ? `Epoch ${metrics.epoch} of ${metrics.epochs}` : "Epoch —"}
+          {epochPct != null ? ` · ${epochPct}%` : ""}
           {metrics?.examplesPerSec ? ` · ${Math.round(metrics.examplesPerSec).toLocaleString()} / s` : ""}
         </p>
       </div>
@@ -241,7 +263,15 @@ export function Toolbar({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={status.progress == null ? undefined : Math.round(Math.max(0, Math.min(1, status.progress)) * 100)}
-          aria-label={status.phase === "evaluating" ? "Evaluating" : status.phase === "preparing" ? "Preparing" : "Training progress"}
+          aria-label={
+            status.phase === "evaluating"
+              ? "Evaluating"
+              : status.phase === "preparing"
+                ? "Preparing"
+                : status.phase === "running"
+                  ? "Epoch progress"
+                  : "Training progress"
+          }
         >
           <span
             style={

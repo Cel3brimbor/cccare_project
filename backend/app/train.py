@@ -16,11 +16,16 @@ import mlx.optimizers as optim
 import numpy as np
 import psutil
 
+from backend.app.archive import ENABLE
 from backend.app.bus import Bus
-from backend.app.data import Corpus
-from backend.app.digits import CLASSES, PIXELS, SIDE, Digits
-from backend.app.model import DigitNet, SentimentNet, bce_with_logits, digit_loss, explain_digit, explain_example, to_unit_interval
+from backend.app.gait import CHANNELS, WINDOW, GaitData, GaitNet, activity_name, explain_gait, layout
 from backend.app.system import device_message, gpu_registry, host_memory, metal_available, metal_memory
+
+if ENABLE:
+    from backend.app.archive.digits import CLASSES, PIXELS, SIDE, Digits
+    from backend.app.archive.imdb import Corpus
+    from backend.app.archive.models import DigitNet, SentimentNet, bce_with_logits, digit_loss, explain_digit, explain_example
+    from backend.app.model import to_unit_interval
 
 log = logging.getLogger("studio")
 
@@ -35,6 +40,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "beta2": 0.999,
     "eps": 1e-8,
     "weightDecay": 0.0,
+    "seed": 0,
+}
+
+GAIT_CONFIG: dict[str, Any] = {
+    "embedDim": 48,
+    "hidden": [128],
+    "lr": 1e-3,
+    "batchSize": 256,
+    "epochs": 4,
+    "optimizer": "adam",
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "eps": 1e-8,
+    "weightDecay": 0.01,
     "seed": 0,
 }
 
@@ -54,16 +73,19 @@ DIGITS_CONFIG: dict[str, Any] = {
 }
 
 
-def sanitize(raw: dict[str, Any]) -> dict[str, Any]:
-    hidden_in = raw.get("hidden") if isinstance(raw.get("hidden"), list) else [64, 32]
+def sanitize(raw: dict[str, Any], task: str = "gait") -> dict[str, Any]:
+    gait = task == "gait"
+    hidden_in = raw.get("hidden") if isinstance(raw.get("hidden"), list) else ([128] if gait else [64, 32])
     hidden: list[int] = []
-    for value in hidden_in[:3]:
+    width_lo = 32 if gait else 4
+    layer_cap = 2 if gait else 3
+    for value in hidden_in[:layer_cap]:
         try:
-            hidden.append(min(1024, max(4, int(value))))
+            hidden.append(min(1024, max(width_lo, int(value))))
         except (TypeError, ValueError):
             continue
     if not hidden:
-        hidden = [64, 32]
+        hidden = [128] if gait else [64, 32]
 
     def clamp_int(key: str, default: int, lo: int, hi: int) -> int:
         try:
@@ -84,18 +106,18 @@ def sanitize(raw: dict[str, Any]) -> dict[str, Any]:
         "embedDim": clamp_int("embedDim", 48, 8, 96),
         "hidden": hidden,
         "lr": clamp_float("lr", 1e-3, 1e-5, 1.0),
-        "batchSize": clamp_int("batchSize", 64, 8, 256),
-        "epochs": clamp_int("epochs", 3, 1, 30),
+        "batchSize": clamp_int("batchSize", 256 if gait else 64, 32 if gait else 8, 768 if gait else 256),
+        "epochs": clamp_int("epochs", 4 if gait else 3, 1, 30),
         "optimizer": optimizer,
         "beta1": clamp_float("beta1", 0.9, 0.0, 0.9999),
         "beta2": clamp_float("beta2", 0.999, 0.0, 0.9999),
         "eps": clamp_float("eps", 1e-8, 0.0, 1e-2),
-        "weightDecay": clamp_float("weightDecay", 0.0, 0.0, 0.1),
+        "weightDecay": clamp_float("weightDecay", 0.01 if gait else 0.0, 0.0, 0.1),
         "seed": clamp_int("seed", 0, 0, 2_147_483_647),
     }
 
 
-def loss_only(model: SentimentNet, tokens: mx.array, labels: mx.array) -> mx.array:
+def loss_only(model: nn.Module, tokens: mx.array, labels: mx.array) -> mx.array:
     return bce_with_logits(model(tokens), labels)
 
 
@@ -139,17 +161,39 @@ def snapshot_weights(model: nn.Module) -> dict[str, Any]:
     return payload
 
 
+def _count_parameters(model: nn.Module) -> int:
+    total = 0
+
+    def walk(tree: Any) -> None:
+        nonlocal total
+        if isinstance(tree, mx.array):
+            total += int(tree.size)
+        elif isinstance(tree, dict):
+            for value in tree.values():
+                walk(value)
+        elif isinstance(tree, (list, tuple)):
+            for value in tree:
+                walk(value)
+
+    walk(model.parameters())
+    return total
+
+
 class Trainer:
     def __init__(self, root: Path):
         self.root = root
-        self.task = "reviews"
-        self.corpus = Corpus(root / "data")
-        self.digits = Digits(root / "data")
+        self.task = "gait"
+        self.gait = GaitData(root / "data")
+        self.corpus = Corpus(root / "data") if ENABLE else None
+        self.digits = Digits(root / "data") if ENABLE else None
         self._saved: dict[str, dict[str, Any]] = {}
+        self._compiled_step = None
+        self._class_weight: mx.array | None = None
+        self.parameter_count = 0
         self.bus = Bus()
         self.commands: queue.Queue[dict[str, Any]] = queue.Queue()
-        self.config = dict(DEFAULT_CONFIG)
-        self.config["hidden"] = list(DEFAULT_CONFIG["hidden"])
+        self.config = dict(GAIT_CONFIG)
+        self.config["hidden"] = list(GAIT_CONFIG["hidden"])
         self.mode = "preparing"
         self.metal = False
         self.model: nn.Module | None = None
@@ -181,19 +225,37 @@ class Trainer:
 
     @property
     def weights_path(self) -> Path:
-        name = "digits.safetensors" if self.task == "digits" else "model.safetensors"
+        if self.task == "gait":
+            name = "gait.safetensors"
+        elif self.task == "digits":
+            name = "digits.safetensors"
+        else:
+            name = "model.safetensors"
         return self.ckpt / name
 
     @property
     def meta_path(self) -> Path:
-        name = "digits.meta.json" if self.task == "digits" else "meta.json"
+        if self.task == "gait":
+            name = "gait.meta.json"
+        elif self.task == "digits":
+            name = "digits.meta.json"
+        else:
+            name = "meta.json"
         return self.ckpt / name
 
     @property
     def data_ready(self) -> bool:
+        if self.task == "gait":
+            return self.gait.ready
         if self.task == "digits":
-            return self.digits.ready
-        return self.corpus.ready
+            return self.digits is not None and self.digits.ready
+        return self.corpus is not None and self.corpus.ready
+
+    def tasks(self) -> list[str]:
+        names = ["gait"]
+        if ENABLE:
+            names.extend(["reviews", "digits"])
+        return names
 
     def start(self) -> None:
         threading.Thread(target=self._loop, name="trainer", daemon=True).start()
@@ -211,6 +273,7 @@ class Trainer:
         cores = registry.get("cores")
         self._device = device_message(cores if isinstance(cores, int) else None)
         self.bus.publish(self._device)
+        self._publish_catalog()
         self._publish_config()
         if not self.metal:
             self._status("error", "Metal is not available on this machine.")
@@ -258,11 +321,17 @@ class Trainer:
 
     def _try_prepare(self) -> None:
         try:
-            if self.task == "digits":
+            if self.task == "gait":
+                if not self.gait.ready:
+                    self.gait.prepare(lambda message, value: self._status("preparing", message, value))
+            elif self.task == "digits":
+                assert self.digits is not None
                 if not self.digits.ready:
                     self.digits.prepare(lambda message, value: self._status("preparing", message, value))
-            elif not self.corpus.ready:
-                self.corpus.prepare(lambda message, value: self._status("preparing", message, value))
+            else:
+                assert self.corpus is not None
+                if not self.corpus.ready:
+                    self.corpus.prepare(lambda message, value: self._status("preparing", message, value))
         except Exception as error:
             log.exception("dataset prepare failed")
             self._status("error", str(error))
@@ -339,7 +408,9 @@ class Trainer:
         elif kind == "reset":
             self._reset()
         elif kind == "predict":
-            if self.task == "digits":
+            if self.task == "gait":
+                self._predict_gait(command.get("index"), str(command.get("id") or ""))
+            elif self.task == "digits":
                 self._predict_digits(command.get("pixels"), str(command.get("id") or ""))
             else:
                 self._predict(str(command.get("text") or ""), str(command.get("id") or ""))
@@ -349,12 +420,12 @@ class Trainer:
     def _shape_differs(self, merged: dict[str, Any]) -> bool:
         hidden_changed = [int(value) for value in merged["hidden"]] != [int(value) for value in self.config["hidden"]]
         seed_changed = int(merged["seed"]) != int(self.config["seed"])
-        if self.task == "digits":
+        if self.task in ("digits", "gait"):
             return hidden_changed or seed_changed
         return hidden_changed or seed_changed or int(merged["embedDim"]) != int(self.config["embedDim"])
 
     def _configure(self, incoming: dict[str, Any]) -> None:
-        merged = sanitize({**self.config, **incoming})
+        merged = sanitize({**self.config, **incoming}, self.task)
         if self._locked and self._shape_differs(merged):
             for key in TRAIN_KEYS:
                 self.config[key] = merged[key]
@@ -395,6 +466,8 @@ class Trainer:
                 self.optimizer.betas = [float(self.config["beta1"]), float(self.config["beta2"])]
                 self.optimizer.eps = float(self.config["eps"])
         mx.eval(self.optimizer.state)
+        if self.task == "gait" and self.model is not None:
+            self._bind_gait_step()
 
     def _start(self) -> None:
         self._ensure_model()
@@ -522,11 +595,48 @@ class Trainer:
             self._status(self.mode, f"Test accuracy {accuracy:.1%}")
 
     def _one_step(self, capture: bool, honor_budget: bool) -> bool:
-        assert self.model is not None and self.optimizer is not None and self._loss_and_grad is not None
+        assert self.model is not None and self.optimizer is not None
+        assert self._loss_and_grad is not None
         batch = self._next_batch(honor_budget)
         if batch is None:
             return False
-        batch_x, labels = batch
+        batch_x, labels, picked = batch
+        if self.task == "gait":
+            assert isinstance(self.model, GaitNet)
+            trace = None
+            if capture:
+                person = int(self.gait.train_person[int(picked[0])]) if self.gait.train_person is not None else None
+                trace = explain_gait(
+                    self.model,
+                    batch_x[0].astype(np.float32),
+                    int(labels[0]),
+                    person=person,
+                    index=int(picked[0]),
+                )
+            mx_x = mx.array(batch_x.astype(np.float32))
+            mx_y = mx.array(labels.astype(np.int32))
+            (loss, accuracy), grads = self._loss_and_grad(self.model, mx_x, mx_y)
+            grads, _norm = optim.clip_grad_norm(grads, 1.0)
+            self.optimizer.update(self.model, grads)
+            mx.eval(loss, accuracy, self.model.parameters())
+            loss_v = float(loss.item())
+            acc_v = float(accuracy.item())
+            self.trained_steps += 1
+            self._locked = True
+            self._rate_examples += int(batch_x.shape[0])
+            self.history.append(
+                {
+                    "step": self.trained_steps,
+                    "loss": round(loss_v, 5),
+                    "accuracy": round(acc_v, 5),
+                    "val": None,
+                }
+            )
+            if len(self.history) > 4000:
+                self.history = self.history[-4000:]
+            if trace is not None:
+                self._finish_trace(trace, "train", loss_v, acc_v)
+            return True
         if self.task == "digits":
             mx_x = mx.array(to_unit_interval(batch_x).reshape(batch_x.shape))
             mx_y = mx.array(labels.astype(np.int32))
@@ -549,6 +659,7 @@ class Trainer:
             if self.task == "digits":
                 trace = explain_digit(snapshot_weights(self.model), batch_x[0], int(labels[0]), SIDE)
             else:
+                assert self.corpus is not None
                 trace = explain_example(
                     snapshot_weights(self.model),
                     batch_x[0],
@@ -576,7 +687,7 @@ class Trainer:
             self._finish_trace(trace, "train", loss_v, acc_v)
         return True
 
-    def _next_batch(self, honor_budget: bool) -> tuple[np.ndarray, np.ndarray] | None:
+    def _next_batch(self, honor_budget: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
         train_x, train_y = self._split("train")
         assert train_x is not None and train_y is not None
         count = int(train_x.shape[0])
@@ -597,23 +708,36 @@ class Trainer:
         batch = int(self.config["batchSize"])
         index = self.perm[self.cursor : self.cursor + batch]
         self.cursor += int(index.shape[0])
-        return train_x[index], train_y[index]
+        return train_x[index], train_y[index], index
 
     def _ensure_model(self, preview: bool = True) -> None:
         if self.model is not None:
             return
         assert self.data_ready
         mx.random.seed(int(self.config["seed"]))
-        if self.task == "digits":
+        if self.task == "gait":
+            assert self.gait.class_weight is not None
+            self.model = GaitNet(list(self.config["hidden"]))
+            self._class_weight = mx.array(self.gait.class_weight.astype(np.float32))
+            self._loss_and_grad = None
+            self._compiled_step = None
+        elif self.task == "digits":
             self.model = DigitNet(list(self.config["hidden"]), PIXELS, CLASSES)
             self._loss_and_grad = nn.value_and_grad(self.model, digit_loss)
+            self._compiled_step = None
         else:
+            assert self.corpus is not None
             self.model = SentimentNet(len(self.corpus.itos), int(self.config["embedDim"]), list(self.config["hidden"]))
             self._loss_and_grad = nn.value_and_grad(self.model, loss_only)
+            self._compiled_step = None
         self.optimizer = self._new_optimizer()
         mx.eval(self.model.parameters())
+        self.parameter_count = _count_parameters(self.model)
         self.optimizer.init(self.model.trainable_parameters())
         mx.eval(self.optimizer.state)
+        if self.task == "gait":
+            self._bind_gait_step()
+        self._publish_config()
         if preview:
             self._publish_preview()
 
@@ -634,12 +758,67 @@ class Trainer:
         assert self.model is not None
         train_x, train_y = self._split("train")
         assert train_x is not None and train_y is not None
-        if self.task == "digits":
+        if self.task == "gait":
+            assert isinstance(self.model, GaitNet)
+            person = int(self.gait.train_person[0]) if self.gait.train_person is not None and self.gait.train_person.size else None
+            trace = explain_gait(self.model, train_x[0].astype(np.float32), int(train_y[0]), person=person, index=0)
+        elif self.task == "digits":
             trace = explain_digit(snapshot_weights(self.model), train_x[0], int(train_y[0]), SIDE)
         else:
+            assert self.corpus is not None
             trace = explain_example(snapshot_weights(self.model), train_x[0], self.corpus.itos, int(train_y[0]))
             trace["text"] = " ".join(trace["tokens"])[:1500]
         self._finish_trace(trace, "preview", None, None)
+
+    def _bind_gait_step(self) -> None:
+        assert isinstance(self.model, GaitNet)
+        assert self._class_weight is not None
+        model = self.model
+        weights = self._class_weight
+
+        def loss_fn(model: GaitNet, x: mx.array, y: mx.array) -> tuple[mx.array, mx.array]:
+            logits = model(x)
+            per = nn.losses.cross_entropy(logits, y, reduction="none")
+            chosen = weights[y]
+            loss = mx.sum(per * chosen) / mx.sum(chosen)
+            accuracy = mx.mean((mx.argmax(logits, axis=-1) == y).astype(mx.float32))
+            return loss, accuracy
+
+        self._compiled_step = None
+        self._loss_and_grad = nn.value_and_grad(model, loss_fn)
+
+    def _predict_gait(self, raw_index: Any, request_id: str) -> None:
+        self._ensure_model()
+        assert isinstance(self.model, GaitNet)
+        try:
+            index = int(raw_index)
+        except (TypeError, ValueError):
+            index = 0
+        window, label, person = self.gait.window("test", index)
+        total = int(self.gait.test_y.shape[0]) if self.gait.test_y is not None else 0
+        chosen = index % total if total else 0
+        trace = explain_gait(self.model, window, label, person=person, index=chosen)
+        self._finish_trace(trace, "probe", None, None)
+        self.bus.emit(
+            {
+                "type": "predict",
+                "id": request_id,
+                "task": "gait",
+                "text": "",
+                "index": chosen,
+                "total": total,
+                "prob": trace["prob"],
+                "logit": trace["logit"],
+                "pred": trace["pred"],
+                "label": label,
+                "activity": activity_name(int(trace["pred"])),
+                "labelName": activity_name(label),
+                "probs": trace["probs"],
+                "untrained": self.trained_steps == 0,
+                "truncated": False,
+                "tokens": [],
+            }
+        )
 
     def _finish_trace(self, trace: dict[str, Any], kind: str, batch_loss: float | None, batch_accuracy: float | None) -> None:
         self._attach_moments(trace)
@@ -709,7 +888,7 @@ class Trainer:
         take = min(2000, int(test_x.shape[0]))
         picked = np.random.default_rng(int(self.config["seed"]) + 17).choice(test_x.shape[0], size=take, replace=False)
         phase = self.mode if self.mode in ("running", "paused", "ready", "evaluating") else "running"
-        noun = "digits" if self.task == "digits" else "reviews"
+        noun = "windows" if self.task == "gait" else "digits" if self.task == "digits" else "reviews"
         self._status(phase, f"Checking 2,000 test {noun}")
         accuracy, loss = self._score(test_x[picked], test_y[picked])
         self.val_acc = round(accuracy, 5)
@@ -728,10 +907,16 @@ class Trainer:
         loss_sum = 0.0
         seen = 0
         digits = self.task == "digits"
+        gait = self.task == "gait"
         for start in range(0, total, 256):
             batch_x = features[start : start + 256]
             batch_y = labels[start : start + 256]
-            if digits:
+            if gait:
+                logits = self.model(mx.array(batch_x.astype(np.float32)))
+                targets = mx.array(batch_y.astype(np.int32))
+                loss = nn.losses.cross_entropy(logits, targets, reduction="sum")
+                hits = mx.sum(mx.argmax(logits, axis=-1) == targets)
+            elif digits:
                 logits = self.model(mx.array(to_unit_interval(batch_x).reshape(batch_x.shape)))
                 targets = mx.array(batch_y.astype(np.int32))
                 loss = nn.losses.cross_entropy(logits, targets, reduction="sum")
@@ -749,7 +934,8 @@ class Trainer:
 
     def _trace_due(self) -> bool:
         now = time.perf_counter()
-        if now - self._last_trace >= 0.25:
+        interval = 0.5 if self.task == "gait" else 0.25
+        if now - self._last_trace >= interval:
             self._last_trace = now
             return True
         return False
@@ -799,6 +985,13 @@ class Trainer:
             within = self.passes - self.run_origin
         return max(1, within)
 
+    def _epoch_progress(self) -> float:
+        train_x, _train_y = self._split("train")
+        count = 0 if train_x is None else int(train_x.shape[0])
+        if count <= 0 or self.perm is None:
+            return 0.0
+        return round(min(1.0, self.cursor / count), 4)
+
     def _chart_history(self) -> list[dict[str, Any]]:
         points = self.history
         limit = 480
@@ -810,6 +1003,8 @@ class Trainer:
         return picked
 
     def _status(self, phase: str, message: str, progress: float | None = None) -> None:
+        if progress is None and phase == "running":
+            progress = self._epoch_progress()
         if phase != self.mode or message != self._message:
             log.info("%s: %s", phase, message)
         if phase in ("preparing", "ready", "running", "paused", "evaluating", "error"):
@@ -845,9 +1040,14 @@ class Trainer:
             "testAccuracy": self.test_acc,
             "testLoss": self.test_loss,
         }
-        if self.task == "digits":
+        if self.task == "gait":
+            payload["dataset"] = "hugadb-v2-acc-emg"
+            payload["window"] = WINDOW
+            payload["channels"] = CHANNELS
+        elif self.task == "digits":
             payload["dataset"] = "mnist28"
         else:
+            assert self.corpus is not None
             payload["vocab"] = hashlib.sha256("\n".join(self.corpus.itos).encode()).hexdigest()[:16]
         self.meta_path.write_text(json.dumps(payload))
 
@@ -855,19 +1055,24 @@ class Trainer:
         if not self.weights_path.exists() or not self.meta_path.exists():
             return
         meta = json.loads(self.meta_path.read_text())
-        if meta.get("task", "reviews") != self.task:
+        if meta.get("task", "gait") != self.task:
             self._clear_checkpoint_files()
             return
-        if self.task == "digits":
+        if self.task == "gait":
+            if meta.get("dataset") != "hugadb-v2-acc-emg" or int(meta.get("window") or 0) != WINDOW:
+                self._clear_checkpoint_files()
+                return
+        elif self.task == "digits":
             if meta.get("dataset") != "mnist28":
                 self._clear_checkpoint_files()
                 return
         else:
+            assert self.corpus is not None
             vocab_id = hashlib.sha256("\n".join(self.corpus.itos).encode()).hexdigest()[:16]
             if meta.get("vocab") != vocab_id:
                 self._clear_checkpoint_files()
                 return
-        self.config = sanitize(meta.get("config") or self.config)
+        self.config = sanitize(meta.get("config") or self.config, self.task)
         self._publish_config()
         self._ensure_model(preview=False)
         assert self.model is not None
@@ -891,30 +1096,57 @@ class Trainer:
                 path.unlink()
 
     def page(self, split: str, offset: int, limit: int) -> dict:
+        if self.task == "gait":
+            return self.gait.page(split, offset, limit)
         if self.task == "digits":
+            assert self.digits is not None
             return self.digits.page(split, offset, limit)
+        assert self.corpus is not None
         return self.corpus.page(split, offset, limit)
 
+    def _publish_catalog(self) -> None:
+        self.bus.publish({"type": "catalog", "tasks": self.tasks(), "task": self.task})
+
     def _publish_config(self) -> None:
-        self.bus.publish({"type": "config", "config": self.config, "task": self.task})
+        payload = dict(self.config)
+        if self.task == "gait":
+            widths, titles = layout(list(self.config["hidden"]))
+            payload["widths"] = widths
+            payload["titles"] = titles
+            payload["frameRows"] = CHANNELS
+            payload["frameCols"] = WINDOW
+            if self.parameter_count:
+                payload["parameters"] = self.parameter_count
+        self.bus.publish({"type": "config", "config": payload, "task": self.task})
 
     def _publish_dataset(self) -> None:
+        if self.task == "gait":
+            self.bus.publish(self.gait.dataset_message())
+            return
         if self.task == "digits":
+            assert self.digits is not None
             self.bus.publish(self.digits.dataset_message())
             return
+        assert self.corpus is not None
         self.bus.publish(self.corpus.dataset_message())
 
     def _split(self, name: str) -> tuple[np.ndarray | None, np.ndarray | None]:
+        if self.task == "gait":
+            if name == "test":
+                return self.gait.test_x, self.gait.test_y
+            return self.gait.train_x, self.gait.train_y
         if self.task == "digits":
+            assert self.digits is not None
             if name == "test":
                 return self.digits.test_x, self.digits.test_y
             return self.digits.train_x, self.digits.train_y
+        assert self.corpus is not None
         if name == "test":
             return self.corpus.test_x, self.corpus.test_y
         return self.corpus.train_x, self.corpus.train_y
 
     def _switch_task(self, name: str) -> None:
-        if name not in ("reviews", "digits") or name == self.task:
+        if name not in self.tasks() or name == self.task:
             return
         if not self.metal:
             self.bus.emit({"type": "error", "message": "Metal is not available, so training stays off."})
@@ -938,7 +1170,13 @@ class Trainer:
             phase = "paused" if self.trained_steps else "ready"
             self._status(phase, "Paused" if phase == "paused" else "Ready on Metal")
             return
-        self._blank_runtime(DIGITS_CONFIG if name == "digits" else DEFAULT_CONFIG)
+        if name == "digits":
+            fresh = DIGITS_CONFIG
+        elif name == "gait":
+            fresh = GAIT_CONFIG
+        else:
+            fresh = DEFAULT_CONFIG
+        self._blank_runtime(fresh)
         self._try_prepare()
 
     def _pack(self) -> dict[str, Any]:

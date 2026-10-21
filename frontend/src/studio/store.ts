@@ -1,9 +1,40 @@
 import { useSyncExternalStore } from "react"
 import { defaultConfig, type ServerMessage, type Studio, type TaskName, type Trace } from "./types"
 
+function nest(values: number[], shape: number[]): number[] | number[][] | number[][][] {
+  if (shape.length <= 1) return values
+  const [rows, ...rest] = shape
+  const width = rest.reduce((product, item) => product * item, 1)
+  const nested: Array<number[] | number[][] | number[][][]> = []
+  for (let row = 0; row < rows; row += 1) {
+    const slice = values.slice(row * width, (row + 1) * width)
+    nested.push(rest.length === 1 ? slice : nest(slice, rest))
+  }
+  return nested as number[][] | number[][][]
+}
+
+function inflate(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(inflate)
+  if (!value || typeof value !== "object") return value
+  const record = value as Record<string, unknown>
+  if (record.dtype === "f32" && typeof record.data === "string" && Array.isArray(record.shape)) {
+    const shape = record.shape.map((item) => Number(item))
+    const binary = Uint8Array.from(atob(record.data), (char) => char.charCodeAt(0))
+    const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength)
+    const count = shape.reduce((product, item) => product * item, 1)
+    const flat = new Array<number>(count)
+    for (let index = 0; index < count; index += 1) flat[index] = view.getFloat32(index * 4, true)
+    return nest(flat, shape)
+  }
+  const next: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(record)) next[key] = inflate(item)
+  return next
+}
+
 const initial: Studio = {
   connected: false,
-  task: "reviews",
+  task: "gait",
+  tasks: ["gait"],
   device: null,
   system: null,
   status: {
@@ -14,7 +45,7 @@ const initial: Studio = {
     locked: false,
     trainedSteps: 0,
     metal: false,
-    task: "reviews",
+    task: "gait",
   },
   config: defaultConfig,
   dataset: null,
@@ -75,6 +106,9 @@ function adoptTask(task: TaskName | undefined, patch: Partial<Studio>): Studio {
 
 function apply(message: ServerMessage) {
   switch (message.type) {
+    case "catalog":
+      commit({ ...state, tasks: message.tasks, task: message.task })
+      break
     case "device":
       commit({ ...state, device: message })
       break
@@ -101,19 +135,21 @@ function apply(message: ServerMessage) {
     case "metrics":
       commit({ ...state, metrics: message })
       break
-    case "trace":
-      latestTrace = message.trace
+    case "trace": {
+      const trace = message.trace ? (inflate(message.trace) as Trace) : null
+      latestTrace = trace
       commit({
         ...state,
-        trace: message.trace,
-        messages: message.trace === null ? [] : state.messages,
+        trace,
+        messages: trace === null ? [] : state.messages,
       })
       break
+    }
     case "predict":
       commit({
         ...state,
         task: message.task,
-        messages: message.task === "digits" ? [message] : [...state.messages, message],
+        messages: message.task === "reviews" ? [...state.messages, message] : [message],
       })
       break
     case "error":
